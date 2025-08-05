@@ -7,3 +7,12 @@ edition = "2024"
 anyhow = "1.0.98"
 rustc-hash = "2.1.1"
 smallvec = "1.15.1"
+
+[target.'cfg(windows)'.dependencies]
+sysinfo = "0.35"
+windows-sys = { version = "0.60.0", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Threading",
+] }

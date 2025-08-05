@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
 use solitaire_solver::{
     action::format_actions,
     board::Board,
@@ -10,11 +10,20 @@ use std::time::Duration;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        bail!("Usage: {} <board_file>", args[0]);
-    }
-    let board_str = fs::read_to_string(&args[1])?;
-    let board = Board::parse(&board_str)?;
+    let board = if args.len() < 2 {
+        #[cfg(windows)]
+        {
+            solitaire_solver::inspect::inspect()?
+        }
+        #[cfg(not(windows))]
+        {
+            anyhow::bail!("Usage: {} <board_file>", args[0])
+        }
+    } else {
+        let board_str = fs::read_to_string(&args[1])?;
+        Board::parse(&board_str)?
+    };
+    println!("=== Board ===\n{}\n", board.pretty_print());
     let SolveResult {
         actions,
         elapsed,
@@ -25,9 +34,12 @@ fn main() -> Result<()> {
     let actions_len = actions.len();
     let elapsed = format_elapsed(elapsed);
     println!(
-        "✓ Solved the game. Steps: {actions_len}, Elapsed: {elapsed}, States: {states}, Minimal: {minimal}"
+        r#"=== Result ===
+Steps: {actions_len}, Elapsed: {elapsed}, States: {states}, Minimal: {minimal}, Actions: ↵
+{}
+    "#,
+        format_actions(&actions)
     );
-    println!("{}", format_actions(&actions));
 
     Ok(())
 }

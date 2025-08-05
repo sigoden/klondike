@@ -245,7 +245,7 @@ impl Board {
         }
 
         // DrawCount
-        output.push_str(&format!("DrawCount: {}\n", self.draw_count()));
+        output.push_str(&format!("DrawCount: {}", self.draw_count()));
 
         output
     }
@@ -258,6 +258,13 @@ pub struct WastePile {
 }
 
 impl WastePile {
+    pub fn new(cards: Vec<Card>, visible_count: usize) -> Self {
+        Self {
+            cards: cards.into_iter().collect(),
+            visible_count,
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.cards.is_empty()
     }
@@ -288,6 +295,13 @@ pub struct Tableau {
 }
 
 impl Tableau {
+    pub fn new(cards: Vec<Card>, face_up_count: usize) -> Self {
+        Self {
+            cards: cards.into_iter().collect(),
+            face_up_count,
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.cards.is_empty()
     }
@@ -414,8 +428,7 @@ Tableau4: 9♠T♥2♠|9♣
 Tableau5: 7♣4♥3♠|A♦
 Tableau6: 3♥3♦4♣5♠4♦|8♣
 Tableau7: 6♦4♠A♥9♦K♠|J♦
-DrawCount: 3
-"#;
+DrawCount: 3"#;
 
         let board = Board::parse(BOARD_STR).unwrap();
         assert_eq!(BOARD_STR, board.pretty_print());
