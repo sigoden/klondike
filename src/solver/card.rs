@@ -64,3 +64,9 @@ impl From<&Card> for CardExt {
         Self::new_with_id(card.id())
     }
 }
+
+impl Default for CardExt {
+    fn default() -> Self {
+        Self::UNKNOWN
+    }
+}

@@ -1,9 +1,9 @@
 use crate::{board::TALON_SIZE, solver::card::CardExt};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Pile {
     pub size: usize,
-    pub first: i8,
+    pub first: Option<u8>,
     cards: [CardExt; TALON_SIZE],
 }
 
@@ -11,13 +11,13 @@ impl Pile {
     #[inline]
     pub fn reset(&mut self) {
         self.size = 0;
-        self.first = -1;
+        self.first = None;
         self.cards.fill(CardExt::UNKNOWN);
     }
 
     #[inline]
     pub fn set_face_up_count(&mut self, count: usize) {
-        self.first = (self.size as i8) - (count as i8);
+        self.first = Some((self.size - count) as u8);
     }
 
     #[inline]
@@ -85,16 +85,18 @@ impl Pile {
 
     #[inline]
     pub fn peek_first_face_up(&self) -> CardExt {
-        if self.size > 0 && self.first > -1 {
-            self.cards[self.first as usize]
-        } else {
-            CardExt::UNKNOWN
+        if self.size > 0 {
+            if let Some(first) = self.first {
+                return self.cards[first as usize];
+            }
         }
+        CardExt::UNKNOWN
     }
 
     #[inline]
     pub fn peek_first_face_up_unchecked(&self) -> CardExt {
-        self.cards[self.first as usize]
+        let first = self.first.expect("No face up card");
+        self.cards[first as usize]
     }
 
     #[inline]
@@ -104,20 +106,10 @@ impl Pile {
 
     #[inline]
     pub fn face_up_count(&self) -> usize {
-        if self.first > -1 {
-            self.size - self.first as usize
+        if let Some(first) = self.first {
+            self.size - first as usize
         } else {
             0
-        }
-    }
-}
-
-impl Default for Pile {
-    fn default() -> Self {
-        Pile {
-            size: 0,
-            first: -1,
-            cards: [CardExt::UNKNOWN; TALON_SIZE],
         }
     }
 }

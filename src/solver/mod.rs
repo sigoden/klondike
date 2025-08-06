@@ -99,13 +99,7 @@ impl Solver {
             find_prime(((max_nodes as f64) * 1.1).round() as _),
             Default::default(),
         );
-        let mut node_storage: Vec<MoveNode> = vec![
-            MoveNode {
-                parent: -1,
-                mov: Move::default(),
-            };
-            max_nodes + 1
-        ];
+        let mut node_storage: Vec<MoveNode> = vec![MoveNode::default(); max_nodes + 1];
 
         let mut node_count = 1;
         let mut max_foundation_score = 0;
@@ -117,10 +111,10 @@ impl Solver {
             remaining: self.minimum_moves_remaining(false),
         };
         closed.insert(self.get_state(), estimate);
-        open.push(MoveIndex::new((node_count - 1) as i32, 0, estimate));
+        open.push(MoveIndex::new(node_count - 1, 0, estimate));
 
         let mut best_solution_move_count = MAX_MOVES_LIMIT as u8;
-        let mut solution_index: i32 = -1;
+        let mut solution_index = None;
         let timer = Instant::now();
 
         while let Some(node) = open.pop() {
@@ -133,8 +127,7 @@ impl Solver {
                 continue;
             }
 
-            let moves_to_make =
-                node_storage[node.index as usize].copy(&mut moves_storage, &node_storage);
+            let moves_to_make = node_storage[node.index].copy(&mut moves_storage, &node_storage);
             self.reset();
             for i in (0..moves_to_make).rev() {
                 self.make_move(moves_storage[i]);
@@ -174,12 +167,12 @@ impl Solver {
                     if !skip {
                         node_storage[node_count] = MoveNode {
                             mov,
-                            parent: node.index,
+                            parent: Some(node.index),
                         };
 
                         let solved = self.foundation_score == MAX_SCORE;
                         if self.foundation_score > max_foundation_score || solved {
-                            solution_index = node_count as i32;
+                            solution_index = Some(node_count);
                             max_foundation_score = self.foundation_score;
                         }
                         if solved {
@@ -194,7 +187,7 @@ impl Solver {
                                 + additional_moves as i16
                                 + (MAX_SCORE - self.foundation_score) as i16
                                 + ((self.round_count as i16) << 1);
-                            open.push(MoveIndex::new(node_count as i32, heuristic, new_estimate));
+                            open.push(MoveIndex::new(node_count, heuristic, new_estimate));
                             node_count += 1;
                             if node_count >= max_nodes {
                                 break;
@@ -207,9 +200,9 @@ impl Solver {
             }
         }
 
-        if solution_index >= 0 {
+        if let Some(solution_index) = solution_index {
             let moves_to_make =
-                node_storage[solution_index as usize].copy(&mut moves_storage, &node_storage);
+                node_storage[solution_index].copy(&mut moves_storage, &node_storage);
             self.reset();
             for i in (0..moves_to_make).rev() {
                 self.make_move(moves_storage[i]);
@@ -262,13 +255,17 @@ impl Solver {
                 let card = pile.get(j);
                 let suit_idx = card.suit as usize;
                 if card.rank < mins[suit_idx] {
-                    if (j as i8) < pile.first {
-                        mins[suit_idx] = card.rank;
+                    if let Some(first) = pile.first {
+                        if (j as u8) < first {
+                            mins[suit_idx] = card.rank;
+                        }
                     }
                 } else {
                     num += 1;
-                    if (j as i8) >= pile.first {
-                        break;
+                    if let Some(first) = pile.first {
+                        if (j as u8) >= first {
+                            break;
+                        }
                     }
                 }
             }
