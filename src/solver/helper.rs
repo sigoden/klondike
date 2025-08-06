@@ -25,7 +25,7 @@ pub struct TalonHelper {
 impl TalonHelper {
     pub fn new() -> Self {
         TalonHelper {
-            stock_waste: std::array::from_fn(|_| CardExt::NULL),
+            stock_waste: std::array::from_fn(|_| CardExt::UNKNOWN),
             cards_drawn: [0; TALON_SIZE],
             stock_used: [false; TALON_SIZE],
         }

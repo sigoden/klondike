@@ -60,15 +60,15 @@ impl PartialEq for Move {
 
 impl Eq for Move {}
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct MoveIndex {
-    pub index: i32,
+    pub index: usize,
     pub priority: i16,
     pub estimate: Estimate,
 }
 
 impl MoveIndex {
-    pub fn new(index: i32, priority: i16, estimate: Estimate) -> Self {
+    pub fn new(index: usize, priority: i16, estimate: Estimate) -> Self {
         MoveIndex {
             index,
             priority,
@@ -89,9 +89,9 @@ impl PartialOrd for MoveIndex {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct MoveNode {
-    pub parent: i32,
+    pub parent: Option<usize>,
     pub mov: Move,
 }
 
@@ -104,16 +104,16 @@ impl MoveNode {
 
         destination[index] = self.mov;
         index += 1;
-        let mut parent_index = self.parent;
-        while parent_index >= 0 {
-            let parent = nodes[parent_index as usize];
+        let mut current_parent = self.parent;
+        while let Some(parent_index) = current_parent {
+            let parent = nodes[parent_index];
             if parent.mov.is_null() {
                 break;
             }
 
             destination[index] = parent.mov;
             index += 1;
-            parent_index = parent.parent;
+            current_parent = parent.parent;
         }
         index
     }

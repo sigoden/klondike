@@ -90,7 +90,7 @@ fn do_solve(board: Board, max_states: usize, minimal: bool) -> Result<Vec<Action
 ===== STATE =====
 {state}
 
-===== STEPS ====="#
+==== ACTIONS ===="#
     );
     Ok(actions)
 }

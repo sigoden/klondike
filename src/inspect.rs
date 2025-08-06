@@ -83,9 +83,7 @@ impl Inspector {
         };
         for i in 0..TOTAL_FOUNDATIONS {
             let (cards, _) = self.read_pile(&pile_list.piles, TOTAL_FOUNDATIONS - 1 - i)?;
-            if let Some(card) = cards.last() {
-                board.foundations[i] = *card;
-            }
+            board.foundations[i] = cards.last().cloned();
         }
         for j in 0..TOTAL_TABLEAUS {
             let (cards, face_up_count) =
