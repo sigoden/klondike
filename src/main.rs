@@ -27,7 +27,7 @@ enum Commands {
     /// Solve the current game
     Solve {
         /// Maximum number of states to explore
-        #[arg(long, default_value_t = 50_000_000, value_name = "NUM")]
+        #[arg(long, default_value_t = 100_000_000, value_name = "NUM")]
         max_states: u32,
         /// Return early when any solution is found (not necessarily minimal)
         #[arg(long)]
@@ -39,7 +39,7 @@ enum Commands {
     #[cfg(windows)]
     Autoplay {
         /// Maximum number of states to explore
-        #[arg(long, default_value_t = 50_000_000, value_name = "NUM")]
+        #[arg(long, default_value_t = 100_000_000, value_name = "NUM")]
         max_states: u32,
         /// Return early when any solution is found (not necessarily minimal)
         #[arg(long)]
