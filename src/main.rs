@@ -28,7 +28,7 @@ enum Commands {
     Solve {
         /// Maximum number of states to explore
         #[arg(long, default_value_t = 50_000_000, value_name = "NUM")]
-        max_states: usize,
+        max_states: u32,
         /// Return early when any solution is found (not necessarily minimal)
         #[arg(long)]
         fast: bool,
@@ -40,7 +40,7 @@ enum Commands {
     Autoplay {
         /// Maximum number of states to explore
         #[arg(long, default_value_t = 50_000_000, value_name = "NUM")]
-        max_states: usize,
+        max_states: u32,
         /// Return early when any solution is found (not necessarily minimal)
         #[arg(long)]
         fast: bool,
@@ -96,7 +96,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn do_solve(board: Board, max_states: usize, minimal: bool) -> Result<Vec<Action>> {
+fn do_solve(board: Board, max_states: u32, minimal: bool) -> Result<Vec<Action>> {
     let state = board.pretty_print();
     let SolveResult {
         actions,

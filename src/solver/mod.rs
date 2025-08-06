@@ -16,10 +16,11 @@ use crate::board::Card;
 use crate::board::{Board, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
 
 use anyhow::{Result, bail};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHasher};
 use smallvec::SmallVec;
 use std::{
     collections::{BinaryHeap, hash_map},
+    hash::Hasher,
     time::{Duration, Instant},
 };
 
@@ -35,9 +36,8 @@ const PILE_STOCK: usize = PILE_TABLEAU_END + 1;
 const PILE_SIZE: usize = PILE_STOCK + 1;
 
 type PossibleMoves = SmallVec<[Move; 64]>;
-type State = [u8; 32];
 
-pub fn solve(board: Board, max_states: usize, minimal: bool) -> Result<SolveResult> {
+pub fn solve(board: Board, max_states: u32, minimal: bool) -> Result<SolveResult> {
     let mut solver = Solver::new();
     solver.set_board(board);
     solver.solve(max_states, minimal)
@@ -90,16 +90,16 @@ impl Solver {
         self.initial_board.draw_count()
     }
 
-    pub fn solve(&mut self, max_nodes: usize, minimal: bool) -> Result<SolveResult> {
+    pub fn solve(&mut self, max_nodes: u32, minimal: bool) -> Result<SolveResult> {
         if !self.initial_board.is_valid() {
             bail!("Invalid initial board state.");
         }
-        let mut open = BinaryHeap::with_capacity(max_nodes);
+        let mut open = BinaryHeap::with_capacity((max_nodes as usize) / 10);
         let mut closed = FxHashMap::with_capacity_and_hasher(
             find_prime(((max_nodes as f64) * 1.1).round() as _),
             Default::default(),
         );
-        let mut node_storage: Vec<MoveNode> = vec![MoveNode::default(); max_nodes + 1];
+        let mut node_storage: Vec<MoveNode> = vec![MoveNode::default(); max_nodes as usize + 1];
 
         let mut node_count = 1;
         let mut max_foundation_score = 0;
@@ -114,7 +114,7 @@ impl Solver {
         open.push(MoveIndex::new(node_count - 1, 0, estimate));
 
         let mut best_solution_move_count = MAX_MOVES_LIMIT as u8;
-        let mut solution_index = None;
+        let mut solution_node_index = None;
         let timer = Instant::now();
 
         while let Some(node) = open.pop() {
@@ -127,7 +127,8 @@ impl Solver {
                 continue;
             }
 
-            let moves_to_make = node_storage[node.index].copy(&mut moves_storage, &node_storage);
+            let moves_to_make =
+                node_storage[node.index as usize].copy(&mut moves_storage, &node_storage);
             self.reset();
             for i in (0..moves_to_make).rev() {
                 self.make_move(moves_storage[i]);
@@ -165,14 +166,14 @@ impl Solver {
                         }
                     }
                     if !skip {
-                        node_storage[node_count] = MoveNode {
+                        node_storage[node_count as usize] = MoveNode {
                             mov,
-                            parent: Some(node.index),
+                            parent: node.index,
                         };
 
                         let solved = self.foundation_score == MAX_SCORE;
                         if self.foundation_score > max_foundation_score || solved {
-                            solution_index = Some(node_count);
+                            solution_node_index = Some(node_count);
                             max_foundation_score = self.foundation_score;
                         }
                         if solved {
@@ -200,9 +201,9 @@ impl Solver {
             }
         }
 
-        if let Some(solution_index) = solution_index {
+        if let Some(node_index) = solution_node_index {
             let moves_to_make =
-                node_storage[solution_index].copy(&mut moves_storage, &node_storage);
+                node_storage[node_index as usize].copy(&mut moves_storage, &node_storage);
             self.reset();
             for i in (0..moves_to_make).rev() {
                 self.make_move(moves_storage[i]);
@@ -274,7 +275,7 @@ impl Solver {
         num as u8
     }
 
-    fn get_state(&self) -> State {
+    fn get_state(&self) -> u64 {
         let mut state = [0; 32];
 
         state[0] = self.piles[PILE_WASTE].size as u8;
@@ -313,7 +314,9 @@ impl Solver {
             }
         }
 
-        state
+        let mut hasher = FxHasher::default();
+        hasher.write(&state);
+        hasher.finish()
     }
 
     fn calculate_additional_moves(&self, mov: Move) -> u8 {
