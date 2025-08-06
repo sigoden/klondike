@@ -15,11 +15,11 @@ use crate::action::Action;
 use crate::board::Card;
 use crate::board::{Board, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
 
+use ahash::AHasher;
 use anyhow::{Result, bail};
-use rustc_hash::{FxHashMap, FxHasher};
 use smallvec::SmallVec;
 use std::{
-    collections::{BinaryHeap, hash_map},
+    collections::BinaryHeap,
     hash::Hasher,
     time::{Duration, Instant},
 };
@@ -95,10 +95,7 @@ impl Solver {
             bail!("Invalid initial board state.");
         }
         let mut open = BinaryHeap::with_capacity((max_nodes as usize) / 10);
-        let mut closed = FxHashMap::with_capacity_and_hasher(
-            find_prime(((max_nodes as f64) * 1.1).round() as _),
-            Default::default(),
-        );
+        let mut closed = StateMap::with_capacity(max_nodes as usize + 1);
         let mut node_storage: Vec<MoveNode> = vec![MoveNode::default(); max_nodes as usize + 1];
 
         let mut node_count = 1;
@@ -153,16 +150,16 @@ impl Solver {
                     let mut skip = false;
 
                     let key = self.get_state();
-                    match closed.entry(key) {
-                        hash_map::Entry::Occupied(mut entry) => {
-                            if entry.get().total() > new_estimate.total() {
-                                entry.get_mut().clone_from(&new_estimate);
+                    match closed.get(key) {
+                        Some((estimate, bucket_index)) => {
+                            if estimate.total() > new_estimate.total() {
+                                closed.estimate_mut(bucket_index).clone_from(&new_estimate);
                             } else {
                                 skip = true
                             }
                         }
-                        hash_map::Entry::Vacant(entry) => {
-                            entry.insert(new_estimate);
+                        None => {
+                            closed.insert(key, new_estimate);
                         }
                     }
                     if !skip {
@@ -314,7 +311,7 @@ impl Solver {
             }
         }
 
-        let mut hasher = FxHasher::default();
+        let mut hasher = AHasher::default();
         hasher.write(&state);
         hasher.finish()
     }
