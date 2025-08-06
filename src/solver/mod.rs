@@ -745,9 +745,9 @@ impl Solver {
             let pile = &mut self.initial_piles[PILE_FOUNDATION_START + i];
             pile.reset();
             let card = board.foundations[i];
-            if card.is_unknown() {
+            let Some(card) = card else {
                 continue;
-            }
+            };
             let suit = card.suit();
             let rank = card.rank();
             foundation_score += rank + 1;
@@ -797,7 +797,7 @@ impl Solver {
             if card.is_unknown() {
                 continue;
             }
-            board.foundations[i] = Card::new_with_id(card.id);
+            board.foundations[i] = Some(Card::new_with_id(card.id));
         }
 
         for i in 0..TOTAL_TABLEAUS {

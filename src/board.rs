@@ -18,7 +18,7 @@ const TABLEAU_SIZE: usize = 19;
 pub struct Board {
     pub stock: SmallVec<[Card; TALON_SIZE]>,
     pub waste: WastePile,
-    pub foundations: [Card; TOTAL_FOUNDATIONS],
+    pub foundations: [Option<Card>; TOTAL_FOUNDATIONS],
     pub tableaus: [Tableau; TOTAL_TABLEAUS],
     pub draw_count: Option<usize>,
 }
@@ -38,12 +38,9 @@ impl Board {
     pub fn foundation_score(&self) -> u8 {
         self.foundations
             .iter()
-            .map(|v| {
-                if v.is_unknown() {
-                    0
-                } else {
-                    v.rank() + 1 // Rank is 0-indexed, so add 1 for score
-                }
+            .map(|card| match card {
+                Some(card) => card.rank() + 1,
+                None => 0,
             })
             .sum()
     }
@@ -78,9 +75,9 @@ impl Board {
             return false;
         }
         for &card in &self.foundations {
-            if card.is_unknown() {
+            let Some(card) = card else {
                 continue;
-            }
+            };
             let cards: Vec<_> = (0..=card.rank())
                 .map(|r| Card::new_with_rank_suit(r, card.suit()))
                 .collect();
@@ -118,7 +115,7 @@ impl Board {
 
     pub fn move_waste_to_foundation(&mut self, idx: usize) {
         let card = self.waste.pop_unchecked();
-        self.foundations[idx] = card;
+        self.foundations[idx] = Some(card);
     }
 
     pub fn move_waste_to_tableau(&mut self, idx: usize) {
@@ -128,7 +125,7 @@ impl Board {
 
     pub fn move_tableau_to_foundation(&mut self, tableau_idx: usize, foundation_idx: usize) {
         let card = self.tableaus[tableau_idx].pop_unchecked();
-        self.foundations[foundation_idx] = card;
+        self.foundations[foundation_idx] = Some(card);
     }
 
     pub fn move_tableau_to_tableau(&mut self, from_idx: usize, to_idx: usize, count: usize) {
@@ -138,8 +135,12 @@ impl Board {
     }
 
     pub fn move_foundation_to_tableau(&mut self, foundation_idx: usize, tableau_idx: usize) {
-        let card = self.foundations[foundation_idx];
-        self.foundations[foundation_idx] = card.prev_sibling();
+        let card = self.foundations[foundation_idx].expect("Foundation must have a card");
+        let rank = card.rank();
+        self.foundations[foundation_idx] = match rank {
+            0 => None,
+            _ => Some(Card::new_with_rank_suit(rank - 1, card.suit())),
+        };
         self.tableaus[tableau_idx].push(card);
     }
 
@@ -193,7 +194,7 @@ impl Board {
                 let idx = idx - 1;
                 let cards = Self::parse_cards(parts.next().unwrap_or("").trim())
                     .with_context(line_context)?;
-                board.foundations[idx] = cards.last().cloned().unwrap_or(Card::default());
+                board.foundations[idx] = cards.last().cloned();
             } else if let Some(rest) = line.strip_prefix("Tableau") {
                 let mut parts = rest.splitn(2, ':');
                 let idx = parts
@@ -278,7 +279,7 @@ impl Board {
 
         // Foundations
         for (i, card) in self.foundations.iter().enumerate() {
-            if !card.is_unknown() {
+            if let Some(card) = card {
                 output.push_str(&format!("Foundation{}: {}\n", i + 1, card.pretty_print()));
             }
         }
@@ -428,33 +429,20 @@ impl Card {
         Ok(Card::new_with_rank_suit(rank as u8, suit as u8))
     }
 
-    #[inline]
     pub fn id(&self) -> u8 {
         self.0
     }
 
-    #[inline]
     pub fn is_unknown(&self) -> bool {
         self.0 >= Card::UNKNOWN.0
     }
 
-    #[inline]
     pub fn rank(&self) -> u8 {
         self.0 % MAX_RANK
     }
 
-    #[inline]
     pub fn suit(&self) -> u8 {
         self.0 / MAX_RANK
-    }
-
-    pub fn prev_sibling(&self) -> Card {
-        let rank = self.rank();
-        if rank == 0 {
-            Card::UNKNOWN
-        } else {
-            Card::new_with_rank_suit(rank - 1, self.suit())
-        }
     }
 
     pub fn pretty_print(&self) -> String {
