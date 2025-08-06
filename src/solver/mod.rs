@@ -13,7 +13,7 @@ use self::pile::*;
 
 use crate::action::Action;
 use crate::board::Card;
-use crate::board::{Board, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
+use crate::board::{Board, MAX_CARD, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
 
 use ahash::AHasher;
 use anyhow::{Result, bail};
@@ -25,15 +25,14 @@ use std::{
 };
 
 const DEFAULT_MAX_ROUNDS: usize = 15;
-const MAX_SCORE: u8 = 52;
 const MAX_MOVES_LIMIT: usize = 255;
-const PILE_WASTE: usize = 0;
-const PILE_FOUNDATION_START: usize = 1;
+const PILE_STOCK: usize = 0;
+const PILE_WASTE: usize = 1;
+const PILE_FOUNDATION_START: usize = 2;
 const PILE_FOUNDATION_END: usize = PILE_FOUNDATION_START + TOTAL_FOUNDATIONS - 1;
 const PILE_TABLEAU_START: usize = PILE_FOUNDATION_END + 1;
 const PILE_TABLEAU_END: usize = PILE_TABLEAU_START + TOTAL_TABLEAUS - 1;
-const PILE_STOCK: usize = PILE_TABLEAU_END + 1;
-const PILE_SIZE: usize = PILE_STOCK + 1;
+const PILE_SIZE: usize = TOTAL_FOUNDATIONS + TOTAL_TABLEAUS + 2;
 
 type PossibleMoves = SmallVec<[Move; 64]>;
 
@@ -168,7 +167,7 @@ impl Solver {
                             parent: node.index,
                         };
 
-                        let solved = self.foundation_score == MAX_SCORE;
+                        let solved = self.foundation_score == MAX_CARD;
                         if self.foundation_score > max_foundation_score || solved {
                             solution_node_index = Some(node_count);
                             max_foundation_score = self.foundation_score;
@@ -183,7 +182,7 @@ impl Solver {
                         } else {
                             let heuristic = ((new_estimate.total() as i16) << 1)
                                 + additional_moves as i16
-                                + (MAX_SCORE - self.foundation_score) as i16
+                                + (MAX_CARD - self.foundation_score) as i16
                                 + ((self.round_count as i16) << 1);
                             open.push(MoveIndex::new(node_count, heuristic, new_estimate));
                             node_count += 1;
@@ -207,7 +206,7 @@ impl Solver {
             }
         }
 
-        if max_foundation_score != MAX_SCORE {
+        if max_foundation_score != MAX_CARD {
             if node_count < max_nodes {
                 bail!("No solution found.");
             } else {
@@ -317,19 +316,19 @@ impl Solver {
     }
 
     fn calculate_additional_moves(&self, mov: Move) -> u8 {
-        let mut num = 1;
+        let mut count = 1;
         let mov_count = mov.count() as u8;
         if mov.from() == PILE_WASTE as u8 && mov_count != 0 {
             let draw_count = self.draw_count() as u8;
             if !mov.flip() {
-                num += mov_count.div_ceil(draw_count);
+                count += mov_count.div_ceil(draw_count);
             } else {
                 let stock_size = self.piles[PILE_STOCK].size as u8;
-                num += stock_size.div_ceil(draw_count);
-                num += (mov_count - stock_size).div_ceil(draw_count);
+                count += stock_size.div_ceil(draw_count);
+                count += (mov_count - stock_size).div_ceil(draw_count);
             }
         }
-        num
+        count
     }
 
     fn compute_possible_moves(&mut self, possible_moves: &mut PossibleMoves) {
@@ -580,7 +579,7 @@ impl Solver {
             let (from_pile, to_pile) = self.get_mut_piles(move_from, move_to);
             from_pile.pop_card_to(to_pile);
 
-            if move_to <= PILE_FOUNDATION_END {
+            if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_to) {
                 self.foundation_score += 1;
             } else if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_from) {
                 self.foundation_score -= 1;
@@ -609,7 +608,7 @@ impl Solver {
         if move_from == PILE_WASTE || move_count == 1 {
             let (to_pile, from_pile) = self.get_mut_piles(move_to, move_from);
             to_pile.pop_card_to(from_pile);
-            if move_to <= PILE_FOUNDATION_END {
+            if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_to) {
                 self.foundation_score -= 1;
             } else if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_from) {
                 self.foundation_score += 1;

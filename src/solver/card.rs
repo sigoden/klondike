@@ -26,6 +26,9 @@ impl CardExt {
     };
 
     pub fn new_with_id(id: u8) -> Self {
+        if id >= MAX_CARD {
+            return Self::UNKNOWN;
+        }
         let rank = id % MAX_RANK;
         let suit = id / MAX_RANK;
         let id2 = (rank << 2) | suit;
