@@ -13,31 +13,30 @@ use self::pile::*;
 
 use crate::action::Action;
 use crate::board::Card;
-use crate::board::{Board, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
+use crate::board::{Board, MAX_CARD, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
 
+use ahash::AHasher;
 use anyhow::{Result, bail};
-use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::{
-    collections::{BinaryHeap, hash_map},
+    collections::BinaryHeap,
+    hash::Hasher,
     time::{Duration, Instant},
 };
 
 const DEFAULT_MAX_ROUNDS: usize = 15;
-const MAX_SCORE: u8 = 52;
 const MAX_MOVES_LIMIT: usize = 255;
-const PILE_WASTE: usize = 0;
-const PILE_FOUNDATION_START: usize = 1;
+const PILE_STOCK: usize = 0;
+const PILE_WASTE: usize = 1;
+const PILE_FOUNDATION_START: usize = 2;
 const PILE_FOUNDATION_END: usize = PILE_FOUNDATION_START + TOTAL_FOUNDATIONS - 1;
 const PILE_TABLEAU_START: usize = PILE_FOUNDATION_END + 1;
 const PILE_TABLEAU_END: usize = PILE_TABLEAU_START + TOTAL_TABLEAUS - 1;
-const PILE_STOCK: usize = PILE_TABLEAU_END + 1;
-const PILE_SIZE: usize = PILE_STOCK + 1;
+const PILE_SIZE: usize = TOTAL_FOUNDATIONS + TOTAL_TABLEAUS + 2;
 
 type PossibleMoves = SmallVec<[Move; 64]>;
-type State = [u8; 32];
 
-pub fn solve(board: Board, max_states: usize, minimal: bool) -> Result<SolveResult> {
+pub fn solve(board: Board, max_states: u32, minimal: bool) -> Result<SolveResult> {
     let mut solver = Solver::new();
     solver.set_board(board);
     solver.solve(max_states, minimal)
@@ -90,16 +89,13 @@ impl Solver {
         self.initial_board.draw_count()
     }
 
-    pub fn solve(&mut self, max_nodes: usize, minimal: bool) -> Result<SolveResult> {
+    pub fn solve(&mut self, max_nodes: u32, minimal: bool) -> Result<SolveResult> {
         if !self.initial_board.is_valid() {
             bail!("Invalid initial board state.");
         }
-        let mut open = BinaryHeap::with_capacity(max_nodes);
-        let mut closed = FxHashMap::with_capacity_and_hasher(
-            find_prime(((max_nodes as f64) * 1.1).round() as _),
-            Default::default(),
-        );
-        let mut node_storage: Vec<MoveNode> = vec![MoveNode::default(); max_nodes + 1];
+        let mut open = BinaryHeap::with_capacity((max_nodes as usize) / 10);
+        let mut closed = StateMap::with_capacity(max_nodes as usize + 1);
+        let mut node_storage: Vec<MoveNode> = vec![MoveNode::default(); max_nodes as usize + 1];
 
         let mut node_count = 1;
         let mut max_foundation_score = 0;
@@ -114,7 +110,7 @@ impl Solver {
         open.push(MoveIndex::new(node_count - 1, 0, estimate));
 
         let mut best_solution_move_count = MAX_MOVES_LIMIT as u8;
-        let mut solution_index = None;
+        let mut solution_node_index = None;
         let timer = Instant::now();
 
         while let Some(node) = open.pop() {
@@ -127,7 +123,8 @@ impl Solver {
                 continue;
             }
 
-            let moves_to_make = node_storage[node.index].copy(&mut moves_storage, &node_storage);
+            let moves_to_make =
+                node_storage[node.index as usize].copy(&mut moves_storage, &node_storage);
             self.reset();
             for i in (0..moves_to_make).rev() {
                 self.make_move(moves_storage[i]);
@@ -152,27 +149,27 @@ impl Solver {
                     let mut skip = false;
 
                     let key = self.get_state();
-                    match closed.entry(key) {
-                        hash_map::Entry::Occupied(mut entry) => {
-                            if entry.get().total() > new_estimate.total() {
-                                entry.get_mut().clone_from(&new_estimate);
+                    match closed.get(key) {
+                        Some((estimate, bucket_index)) => {
+                            if estimate.total() > new_estimate.total() {
+                                closed.estimate_mut(bucket_index).clone_from(&new_estimate);
                             } else {
                                 skip = true
                             }
                         }
-                        hash_map::Entry::Vacant(entry) => {
-                            entry.insert(new_estimate);
+                        None => {
+                            closed.insert(key, new_estimate);
                         }
                     }
                     if !skip {
-                        node_storage[node_count] = MoveNode {
+                        node_storage[node_count as usize] = MoveNode {
                             mov,
-                            parent: Some(node.index),
+                            parent: node.index,
                         };
 
-                        let solved = self.foundation_score == MAX_SCORE;
+                        let solved = self.foundation_score == MAX_CARD;
                         if self.foundation_score > max_foundation_score || solved {
-                            solution_index = Some(node_count);
+                            solution_node_index = Some(node_count);
                             max_foundation_score = self.foundation_score;
                         }
                         if solved {
@@ -185,7 +182,7 @@ impl Solver {
                         } else {
                             let heuristic = ((new_estimate.total() as i16) << 1)
                                 + additional_moves as i16
-                                + (MAX_SCORE - self.foundation_score) as i16
+                                + (MAX_CARD - self.foundation_score) as i16
                                 + ((self.round_count as i16) << 1);
                             open.push(MoveIndex::new(node_count, heuristic, new_estimate));
                             node_count += 1;
@@ -200,16 +197,16 @@ impl Solver {
             }
         }
 
-        if let Some(solution_index) = solution_index {
+        if let Some(node_index) = solution_node_index {
             let moves_to_make =
-                node_storage[solution_index].copy(&mut moves_storage, &node_storage);
+                node_storage[node_index as usize].copy(&mut moves_storage, &node_storage);
             self.reset();
             for i in (0..moves_to_make).rev() {
                 self.make_move(moves_storage[i]);
             }
         }
 
-        if max_foundation_score != MAX_SCORE {
+        if max_foundation_score != MAX_CARD {
             if node_count < max_nodes {
                 bail!("No solution found.");
             } else {
@@ -274,7 +271,7 @@ impl Solver {
         num as u8
     }
 
-    fn get_state(&self) -> State {
+    fn get_state(&self) -> u64 {
         let mut state = [0; 32];
 
         state[0] = self.piles[PILE_WASTE].size as u8;
@@ -313,23 +310,25 @@ impl Solver {
             }
         }
 
-        state
+        let mut hasher = AHasher::default();
+        hasher.write(&state);
+        hasher.finish()
     }
 
     fn calculate_additional_moves(&self, mov: Move) -> u8 {
-        let mut num = 1;
+        let mut count = 1;
         let mov_count = mov.count() as u8;
         if mov.from() == PILE_WASTE as u8 && mov_count != 0 {
             let draw_count = self.draw_count() as u8;
             if !mov.flip() {
-                num += mov_count.div_ceil(draw_count);
+                count += mov_count.div_ceil(draw_count);
             } else {
                 let stock_size = self.piles[PILE_STOCK].size as u8;
-                num += stock_size.div_ceil(draw_count);
-                num += (mov_count - stock_size).div_ceil(draw_count);
+                count += stock_size.div_ceil(draw_count);
+                count += (mov_count - stock_size).div_ceil(draw_count);
             }
         }
-        num
+        count
     }
 
     fn compute_possible_moves(&mut self, possible_moves: &mut PossibleMoves) {
@@ -580,7 +579,7 @@ impl Solver {
             let (from_pile, to_pile) = self.get_mut_piles(move_from, move_to);
             from_pile.pop_card_to(to_pile);
 
-            if move_to <= PILE_FOUNDATION_END {
+            if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_to) {
                 self.foundation_score += 1;
             } else if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_from) {
                 self.foundation_score -= 1;
@@ -609,7 +608,7 @@ impl Solver {
         if move_from == PILE_WASTE || move_count == 1 {
             let (to_pile, from_pile) = self.get_mut_piles(move_to, move_from);
             to_pile.pop_card_to(from_pile);
-            if move_to <= PILE_FOUNDATION_END {
+            if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_to) {
                 self.foundation_score -= 1;
             } else if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_from) {
                 self.foundation_score += 1;
@@ -856,8 +855,8 @@ DrawCount: 3
 "#;
 
         let board = Board::parse(BOARD_STR).unwrap();
-        let result = solve(board, 50_000_000, false).unwrap();
-        assert_eq!(result.states, 66267);
+        let result = solve(board, 100_000, false).unwrap();
+        assert_eq!(result.states, 66_267);
         assert_eq!(result.actions.len(), 111);
         let encoded_actions = crate::action::format_actions(&result.actions);
         println!("{encoded_actions}");

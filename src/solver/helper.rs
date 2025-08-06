@@ -16,6 +16,70 @@ impl Estimate {
 }
 
 #[derive(Debug, Clone)]
+pub struct StateMap {
+    capacity: usize,
+    buckets: Vec<Bucket>,
+}
+
+impl StateMap {
+    pub fn with_capacity(capacity: usize) -> Self {
+        let empty_bucket = Bucket {
+            key: u64::MAX,
+            value: Estimate::default(),
+        };
+        let buckets = vec![empty_bucket; capacity];
+        Self { capacity, buckets }
+    }
+
+    pub fn get(&self, key: u64) -> Option<(&Estimate, usize)> {
+        let mut index = (key as usize) % self.capacity;
+        for _ in 0..self.capacity {
+            let bucket = &self.buckets[index];
+            if bucket.is_empty() {
+                return None;
+            }
+            if bucket.key == key {
+                return Some((&bucket.value, index));
+            }
+            index = (index + 1) % self.capacity;
+        }
+        None
+    }
+
+    pub fn insert(&mut self, key: u64, value: Estimate) {
+        let mut index = (key as usize) % self.capacity;
+        for _ in 0..self.capacity {
+            let bucket = &mut self.buckets[index];
+            if bucket.is_empty() {
+                unsafe {
+                    std::ptr::write(bucket, Bucket { key, value });
+                }
+                return;
+            }
+            index = (index + 1) % self.capacity;
+        }
+        panic!("StateMap full");
+    }
+
+    pub fn estimate_mut(&mut self, index: usize) -> &mut Estimate {
+        &mut self.buckets[index].value
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Debug, Clone)]
+struct Bucket {
+    key: u64,
+    value: Estimate,
+}
+
+impl Bucket {
+    fn is_empty(&self) -> bool {
+        self.key == u64::MAX
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct TalonHelper {
     pub stock_waste: [CardExt; TALON_SIZE],
     pub cards_drawn: [i32; TALON_SIZE],
@@ -92,31 +156,4 @@ impl TalonHelper {
 
         size
     }
-}
-
-pub fn find_prime(start: usize) -> usize {
-    fn is_prime(n: usize) -> bool {
-        if n < 2 {
-            return false;
-        }
-        if n == 2 {
-            return true;
-        }
-        if n % 2 == 0 {
-            return false;
-        }
-        let sqrt_n = (n as f64).sqrt() as usize;
-        for i in (3..=sqrt_n).step_by(2) {
-            if n % i == 0 {
-                return false;
-            }
-        }
-        true
-    }
-
-    let mut n = start.max(2);
-    while !is_prime(n) {
-        n += 1;
-    }
-    n
 }
