@@ -12,15 +12,13 @@ use crate::action::Action;
 use crate::board::Card;
 use crate::board::{Board, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
 
-use anyhow::Result;
-use anyhow::bail;
+use anyhow::{Result, bail};
 use rustc_hash::FxHashMap;
-use rustc_hash::FxHasher;
 use smallvec::SmallVec;
-use std::collections::hash_map;
-use std::hash::Hasher;
-use std::time::Instant;
-use std::{collections::BinaryHeap, time::Duration};
+use std::{
+    collections::{BinaryHeap, hash_map},
+    time::{Duration, Instant},
+};
 
 const DEFAULT_MAX_ROUNDS: usize = 15;
 const MAX_SCORE: u8 = 52;
@@ -34,6 +32,7 @@ const PILE_STOCK: usize = PILE_TABLEAU_END + 1;
 const PILE_SIZE: usize = PILE_STOCK + 1;
 
 type PossibleMoves = SmallVec<[Move; 64]>;
+type State = [u8; 32];
 
 pub fn solve(board: Board, max_states: usize, minimal: bool) -> Result<SolveResult> {
     let mut solver = Solver::new(board);
@@ -109,7 +108,7 @@ impl Solver {
             current: 0,
             remaining: self.minimum_moves_remaining(false),
         };
-        closed.insert(self.state_hash(), estimate);
+        closed.insert(self.get_state(), estimate);
         open.push(MoveIndex::new((node_count - 1) as i32, 0, estimate));
 
         let mut best_solution_move_count = MAX_MOVES_LIMIT as u8;
@@ -151,7 +150,7 @@ impl Solver {
                 {
                     let mut skip = false;
 
-                    let key = self.state_hash();
+                    let key = self.get_state();
                     match closed.entry(key) {
                         hash_map::Entry::Occupied(mut entry) => {
                             if entry.get().total() > new_estimate.total() {
@@ -237,10 +236,9 @@ impl Solver {
         if draw_count == 1 || is_last_round {
             for i in 0..waste_size {
                 let card = waste_pile.get(i);
-                let rank = card.rank;
                 let suit_idx = card.suit as usize;
-                if rank < mins[suit_idx] {
-                    mins[suit_idx] = rank;
+                if card.rank < mins[suit_idx] {
+                    mins[suit_idx] = card.rank;
                 } else {
                     num += 1;
                 }
@@ -254,11 +252,10 @@ impl Solver {
 
             for j in 0..pile.size {
                 let card = pile.get(j);
-                let rank = card.rank;
                 let suit_idx = card.suit as usize;
-                if rank < mins[suit_idx] {
+                if card.rank < mins[suit_idx] {
                     if (j as i8) < pile.first {
-                        mins[suit_idx] = rank;
+                        mins[suit_idx] = card.rank;
                     }
                 } else {
                     num += 1;
@@ -272,19 +269,15 @@ impl Solver {
         num as u8
     }
 
-    fn state_hash(&self) -> u64 {
-        let mut hasher = FxHasher::default();
+    fn get_state(&self) -> State {
+        let mut state = [0; 32];
 
-        hasher.write_u8(
-            ((self.piles[PILE_FOUNDATION_START].size << 4)
-                | self.piles[PILE_FOUNDATION_START + 2].size) as u8,
-        );
-        hasher.write_u8(
-            ((self.piles[PILE_FOUNDATION_START + 1].size << 4)
-                | self.piles[PILE_FOUNDATION_START + 3].size) as u8,
-        );
+        state[0] = self.piles[PILE_WASTE].size as u8;
 
-        hasher.write_u8(self.piles[PILE_WASTE].size as u8);
+        state[1] = ((self.piles[PILE_FOUNDATION_START].size << 4)
+            | self.piles[PILE_FOUNDATION_START + 2].size) as u8;
+        state[2] = ((self.piles[PILE_FOUNDATION_START + 1].size << 4)
+            | self.piles[PILE_FOUNDATION_START + 3].size) as u8;
 
         let mut tableau_idxs: [usize; TOTAL_TABLEAUS] =
             std::array::from_fn(|i| PILE_TABLEAU_START + i);
@@ -297,19 +290,25 @@ impl Solver {
                 .cmp(&pile_a.peek_first_face_up().id2)
         });
 
-        for &idx in tableau_idxs.iter() {
-            let pile = &self.piles[idx];
+        for (i, &tableau_idx) in tableau_idxs.iter().enumerate() {
+            let state_idx = 4 * (i + 1);
+            let pile = &self.piles[tableau_idx];
             let face_up_count = pile.face_up_count();
-            hasher.write_u8(face_up_count as u8);
+            state[state_idx] = face_up_count as u8;
             if face_up_count > 0 {
-                hasher.write_u8(pile.peek_first_face_up_unchecked().id);
+                state[state_idx + 1] = pile.peek_first_face_up_unchecked().id;
+                let mut flags: u16 = 0;
                 for card_offset in 0..(face_up_count - 1) {
-                    hasher.write_u8(pile.peek_nth_from_top_unchecked(card_offset).order);
+                    let order = pile.peek_nth_from_top_unchecked(card_offset).order as u16;
+                    flags |= order << card_offset;
                 }
+                let flag_bytes = flags.to_be_bytes();
+                state[state_idx + 2] = flag_bytes[0];
+                state[state_idx + 3] = flag_bytes[1];
             }
         }
 
-        hasher.finish()
+        state
     }
 
     fn calculate_additional_moves(&self, mov: Move) -> u8 {
@@ -332,7 +331,8 @@ impl Solver {
         self.foundation_minimum = (PILE_FOUNDATION_START..=PILE_FOUNDATION_END)
             .map(|i| self.piles[i].size)
             .min()
-            .unwrap_or(0) as u8;
+            .unwrap_or(0) as u8
+            + 1;
 
         if self.compute_with_last_move(possible_moves) {
             return;
@@ -374,12 +374,12 @@ impl Solver {
 
     fn compute_move_from_tableau(&mut self, possible_moves: &mut PossibleMoves) -> bool {
         let mut non_empty_tableaus: SmallVec<[u8; TOTAL_TABLEAUS]> = SmallVec::new();
-        let mut empty_tableau_count = 0;
+        let mut empty_tableaus_count = 0;
         for idx in PILE_TABLEAU_START..=PILE_TABLEAU_END {
             if self.piles[idx].size > 0 {
                 non_empty_tableaus.push(idx as u8);
             } else {
-                empty_tableau_count += 1;
+                empty_tableaus_count += 1;
             }
         }
 
@@ -395,7 +395,7 @@ impl Solver {
                     1,
                     src_pile_size > 1 && src_pile.face_up_count() == 1,
                 );
-                if src_top_card.rank <= self.foundation_minimum + 1 {
+                if src_top_card.rank <= self.foundation_minimum {
                     possible_moves.clear();
                     possible_moves.push(mov);
                     return true;
@@ -436,7 +436,7 @@ impl Solver {
                 }
                 let src_moved_count = dest_top_card.rank as i32 - src_top_card.rank as i32;
                 if (src_moved_count == src_face_up_count
-                    && (src_moved_count != src_pile_size as i32 || empty_tableau_count == 0))
+                    && (src_moved_count != src_pile_size as i32 || empty_tableaus_count == 0))
                     || (src_moved_count < src_face_up_count
                         && self
                             .can_move_to_foundation(
@@ -480,7 +480,7 @@ impl Solver {
                     cards_to_draw as u8,
                     flip,
                 ));
-                if talon_card.rank <= self.foundation_minimum + 1 {
+                if talon_card.rank <= self.foundation_minimum {
                     if draw_count > 1 {
                         continue;
                     }
@@ -513,7 +513,7 @@ impl Solver {
     fn compute_move_from_foundation(&mut self, possible_moves: &mut PossibleMoves) -> bool {
         for foundation_idx in PILE_FOUNDATION_START..=PILE_FOUNDATION_END {
             let foundation_pile = &self.piles[foundation_idx];
-            if foundation_pile.size == self.foundation_minimum as usize + 1 {
+            if foundation_pile.size <= self.foundation_minimum as usize {
                 continue;
             }
             let foundation_card = foundation_pile.peek_top_unchecked();
