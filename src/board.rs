@@ -331,6 +331,10 @@ impl WastePile {
         self.cards.len()
     }
 
+    pub fn peek_top(&self) -> Option<&Card> {
+        self.cards.last()
+    }
+
     pub fn pop_unchecked(&mut self) -> Card {
         match self.cards.pop() {
             Some(card) => {
@@ -366,6 +370,10 @@ impl Tableau {
 
     pub fn len(&self) -> usize {
         self.cards.len()
+    }
+
+    pub fn peek_top(&self) -> Option<&Card> {
+        self.cards.last()
     }
 
     pub fn pop_unchecked(&mut self) -> Card {
