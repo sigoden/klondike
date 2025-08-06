@@ -21,19 +21,32 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Inspect the game state
+    /// Inspect the current game state
     #[cfg(windows)]
     Inspect,
-    /// Solve the game
+    /// Solve the current game
     Solve {
-        /// Max states to try to find a solution
+        /// Maximum number of states to explore
         #[arg(long, default_value_t = 50_000_000, value_name = "NUM")]
         max_states: usize,
-        /// Whether to find the solution with minimal steps
-        #[arg(long, default_value_t = true)]
-        minimal: bool,
-        /// Optional file to load the game state from
+        /// Return early when any solution is found (not necessarily minimal)
+        #[arg(long)]
+        fast: bool,
+        /// Path to file to load the game state from
         file: Option<String>,
+    },
+    /// Autoplay the game
+    #[cfg(windows)]
+    Autoplay {
+        /// Maximum number of states to explore
+        #[arg(long, default_value_t = 50_000_000, value_name = "NUM")]
+        max_states: usize,
+        /// Return early when any solution is found (not necessarily minimal)
+        #[arg(long)]
+        fast: bool,
+        /// Interval between actions in milliseconds
+        #[arg(short, long, default_value_t = 3000)]
+        interval: u64,
     },
 }
 
@@ -48,7 +61,7 @@ fn main() -> Result<()> {
         }
         Commands::Solve {
             max_states,
-            minimal,
+            fast,
             file,
         } => {
             let board = if let Some(file) = file {
@@ -64,8 +77,19 @@ fn main() -> Result<()> {
                     anyhow::bail!("The 'solver' requires a file to load the game state from.");
                 }
             };
-            let actions = do_solve(board, *max_states, *minimal)?;
+            let actions = do_solve(board, *max_states, !fast)?;
             println!("{}", format_actions(&actions));
+        }
+        #[cfg(windows)]
+        Commands::Autoplay {
+            max_states,
+            fast,
+            interval,
+        } => {
+            let board = solitaire_solver::inspect::inspect()?;
+            let actions = do_solve(board.clone(), *max_states, !fast)?;
+            solitaire_solver::autoplay::autoplay(board, actions, *interval)
+                .map_err(|err| anyhow!("Autoplay failed; {err}"))?;
         }
     }
 

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.98"
 clap = { version = "4.5.42", features = ["derive"] }
+enigo = "0.5.0"
 rustc-hash = "2.1.1"
 smallvec = "1.15.1"
 
@@ -16,4 +17,6 @@ windows-sys = { version = "0.60.0", features = [
     "Win32_System_Diagnostics_Debug",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Dwm",
 ] }
