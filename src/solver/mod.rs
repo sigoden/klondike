@@ -1,3 +1,6 @@
+//! This module contains the core logic for solving Solitaire games using the A* search algorithm.
+//!
+/// Migrated from the https://github.com/ShootMe/MinimalKlondike/blob/8983a1375aa15c5ca7f8c3df054aef37218f85c8/Entities/Board.cs
 mod card;
 mod helper;
 mod move_;
@@ -35,12 +38,12 @@ type PossibleMoves = SmallVec<[Move; 64]>;
 type State = [u8; 32];
 
 pub fn solve(board: Board, max_states: usize, minimal: bool) -> Result<SolveResult> {
-    let mut solver = Solver::new(board);
+    let mut solver = Solver::new();
+    solver.set_board(board);
     solver.solve(max_states, minimal)
 }
 
 /// A struct representing the solver for the Solitaire game.
-/// Migrated from the https://github.com/ShootMe/MinimalKlondike/blob/8983a1375aa15c5ca7f8c3df054aef37218f85c8/Entities/Board.cs
 #[derive(Debug, Clone)]
 pub struct Solver {
     pub allow_foundation_to_tableau: bool,
@@ -58,13 +61,19 @@ pub struct Solver {
     round_count: usize,
 }
 
+impl Default for Solver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Solver {
-    pub fn new(board: Board) -> Self {
-        let mut solver = Self {
+    pub fn new() -> Self {
+        Self {
             allow_foundation_to_tableau: false,
             max_rounds: DEFAULT_MAX_ROUNDS,
             helper: TalonHelper::new(),
-            initial_board: Board::new(board.draw_count()),
+            initial_board: Board::default(),
             initial_piles: std::array::from_fn(|_| Default::default()),
             initial_foundation_score: 0,
             piles: std::array::from_fn(|_| Default::default()),
@@ -74,11 +83,7 @@ impl Solver {
             last_move: Default::default(),
             moves_total: 0,
             round_count: 1,
-        };
-
-        solver.set_board(board);
-
-        solver
+        }
     }
 
     pub fn draw_count(&self) -> usize {
@@ -86,6 +91,9 @@ impl Solver {
     }
 
     pub fn solve(&mut self, max_nodes: usize, minimal: bool) -> Result<SolveResult> {
+        if !self.initial_board.is_valid() {
+            bail!("Invalid initial board state.");
+        }
         let mut open = BinaryHeap::with_capacity(max_nodes);
         let mut closed = FxHashMap::with_capacity_and_hasher(
             find_prime(((max_nodes as f64) * 1.1).round() as _),
@@ -212,7 +220,7 @@ impl Solver {
             if node_count < max_nodes {
                 bail!("No solution found.");
             } else {
-                bail!("Unable to solve the game; reached max states: {max_nodes}.");
+                bail!("Unable to solve the game; Reached max states: {max_nodes}.");
             }
         }
 
@@ -737,7 +745,7 @@ impl Solver {
             let pile = &mut self.initial_piles[PILE_FOUNDATION_START + i];
             pile.reset();
             let card = board.foundations[i];
-            if card.is_null() {
+            if card.is_unknown() {
                 continue;
             }
             let suit = card.suit();
@@ -764,7 +772,7 @@ impl Solver {
     }
 
     pub fn get_board(&self) -> Board {
-        let mut board = Board::new(self.initial_board.draw_count());
+        let mut board = Board::default();
 
         {
             let stock_pile = &self.piles[PILE_STOCK];
@@ -786,9 +794,10 @@ impl Solver {
 
         for i in 0..TOTAL_FOUNDATIONS {
             let card = self.piles[PILE_FOUNDATION_START + i].peek_top();
-            if !card.is_null() {
-                board.foundations[i] = Card::new_with_id(card.id);
+            if card.is_unknown() {
+                continue;
             }
+            board.foundations[i] = Card::new_with_id(card.id);
         }
 
         for i in 0..TOTAL_TABLEAUS {

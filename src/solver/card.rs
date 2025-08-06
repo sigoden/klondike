@@ -14,7 +14,7 @@ pub struct CardExt {
 }
 
 impl CardExt {
-    pub const NULL: CardExt = CardExt {
+    pub const UNKNOWN: CardExt = CardExt {
         id: MAX_CARD,
         id2: 0,
         suit: MAX_SUIT,
@@ -50,8 +50,8 @@ impl CardExt {
         Self::new_with_id((suit * MAX_RANK) + rank)
     }
 
-    pub fn is_null(&self) -> bool {
-        self.id == MAX_CARD
+    pub fn is_unknown(&self) -> bool {
+        self.id >= MAX_CARD
     }
 
     pub fn is_king(&self) -> bool {

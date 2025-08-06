@@ -12,7 +12,7 @@ impl Pile {
     pub fn reset(&mut self) {
         self.size = 0;
         self.first = -1;
-        self.cards.fill(CardExt::NULL);
+        self.cards.fill(CardExt::UNKNOWN);
     }
 
     #[inline]
@@ -74,7 +74,7 @@ impl Pile {
         if self.size > 0 {
             self.cards[self.size - 1]
         } else {
-            CardExt::NULL
+            CardExt::UNKNOWN
         }
     }
 
@@ -88,7 +88,7 @@ impl Pile {
         if self.size > 0 && self.first > -1 {
             self.cards[self.first as usize]
         } else {
-            CardExt::NULL
+            CardExt::UNKNOWN
         }
     }
 
@@ -117,7 +117,7 @@ impl Default for Pile {
         Pile {
             size: 0,
             first: -1,
-            cards: [CardExt::NULL; TALON_SIZE],
+            cards: [CardExt::UNKNOWN; TALON_SIZE],
         }
     }
 }
