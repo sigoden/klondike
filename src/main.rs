@@ -105,7 +105,7 @@ fn main() -> Result<()> {
             output,
         } => {
             let mut board = if let Some(seed) = greenfelt {
-                Board::new_from_seed(*seed, None)
+                Board::new_from_seed(*seed)
             } else {
                 #[cfg(windows)]
                 {
@@ -141,7 +141,7 @@ fn main() -> Result<()> {
                 let content = std::fs::read_to_string(file)?;
                 Board::parse(&content).map_err(|err| anyhow!("Failed to parse board; {err}"))?
             } else if let Some(seed) = greenfelt {
-                Board::new_from_seed(*seed, None)
+                Board::new_from_seed(*seed)
             } else {
                 #[cfg(windows)]
                 {
