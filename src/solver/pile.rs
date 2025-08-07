@@ -85,10 +85,10 @@ impl Pile {
 
     #[inline]
     pub fn peek_first_face_up(&self) -> CardExt {
-        if self.size > 0 {
-            if let Some(first) = self.first {
-                return self.cards[first as usize];
-            }
+        if self.size > 0
+            && let Some(first) = self.first
+        {
+            return self.cards[first as usize];
         }
         CardExt::UNKNOWN
     }

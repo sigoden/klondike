@@ -42,7 +42,7 @@ pub fn get_pid() -> Result<u32> {
     if let Some(process) = system.processes_by_name(OsStr::new(PROCESS_NAME)).next() {
         Ok(process.pid().as_u32())
     } else {
-        bail!("Process '{PROCESS_NAME}' not found");
+        bail!("Process '{PROCESS_NAME}' not found. Please ensure {PROCESS_NAME} is running.");
     }
 }
 

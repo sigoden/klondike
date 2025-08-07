@@ -31,8 +31,62 @@ impl Board {
         }
     }
 
+    pub fn new_from_seed(seed: u32, draw_count: Option<usize>) -> Self {
+        let mut current_seed = seed;
+        let mut rnd = || {
+            current_seed = ((current_seed as u64 * 16807) % 0x7fffffff) as u32;
+            current_seed
+        };
+        let mut deck = [Card::UNKNOWN; 52];
+        for (i, id) in (0..26).chain(39..52).chain(26..39).enumerate() {
+            deck[i] = Card::new_with_id(id as u8);
+        }
+
+        for _ in 0..7 {
+            for j in 0..52 {
+                let k = (rnd() % 52) as usize;
+                deck.swap(j, k);
+            }
+        }
+
+        deck.rotate_left(24);
+
+        let mut orig: i32 = 27;
+        for i in 0..7_i32 {
+            let mut pos = (i + 1) * (i + 2) / 2 - 1;
+            for j in (0..=(6 - i)).rev() {
+                if j >= i {
+                    deck.swap(pos as usize, orig as usize);
+                }
+                orig -= 1;
+                pos += 6 - j + 1;
+            }
+        }
+
+        let mut board = Board::new(draw_count);
+
+        let mut m = 0;
+        for j in 1..=TOTAL_TABLEAUS {
+            let tableau_idx = j - 1;
+            for _ in 0..j {
+                board.tableaus[tableau_idx].cards.push(deck[m]);
+                m += 1;
+            }
+            board.tableaus[tableau_idx].face_up_count = 1;
+        }
+
+        board.stock.extend_from_slice(&deck[m..]);
+
+        board
+    }
+
     pub fn draw_count(&self) -> usize {
         self.draw_count.unwrap_or(1)
+    }
+
+    pub fn set_draw_count(&mut self, value: usize) {
+        self.draw_count = Some(value);
+        self.waste.visible_count = self.waste.visible_count.min(value);
     }
 
     pub fn foundation_score(&self) -> u8 {
@@ -498,5 +552,13 @@ DrawCount: 3"#;
         assert_eq!(board.draw_count(), 1);
         assert_eq!(board.foundation_score(), 0);
         assert!(!board.is_valid());
+    }
+
+    #[test]
+    fn test_new_from_seed() {
+        let board = Board::new_from_seed(670334786, Some(1));
+        assert_eq!(board.draw_count(), 1);
+        assert!(board.is_valid());
+        println!("{}", board.pretty_print());
     }
 }

@@ -248,17 +248,17 @@ impl Solver {
                 let card = pile.get(j);
                 let suit_idx = card.suit as usize;
                 if card.rank < mins[suit_idx] {
-                    if let Some(first) = pile.first {
-                        if (j as u8) < first {
-                            mins[suit_idx] = card.rank;
-                        }
+                    if let Some(first) = pile.first
+                        && (j as u8) < first
+                    {
+                        mins[suit_idx] = card.rank;
                     }
                 } else {
                     num += 1;
-                    if let Some(first) = pile.first {
-                        if (j as u8) >= first {
-                            break;
-                        }
+                    if let Some(first) = pile.first
+                        && (j as u8) >= first
+                    {
+                        break;
                     }
                 }
             }

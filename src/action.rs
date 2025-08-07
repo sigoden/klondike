@@ -11,6 +11,12 @@ pub enum Action {
     Redeal,
 }
 
+impl Action {
+    pub fn is_redeal(&self) -> bool {
+        matches!(self, Action::Redeal)
+    }
+}
+
 pub fn format_actions(actions: &[Action]) -> String {
     let mut list = vec![];
     let mut i = 0;
@@ -55,7 +61,16 @@ pub fn format_actions(actions: &[Action]) -> String {
         }
         i += 1;
     }
-    list.join(" ")
+
+    let mut output = String::new();
+    for chunk in list.chunks(10) {
+        for cmd in chunk {
+            output.push_str(&format!("{cmd:<8}"));
+        }
+        output.push('\n');
+    }
+
+    output
 }
 
 pub fn apply_action(board: &mut Board, action: &Action) {
