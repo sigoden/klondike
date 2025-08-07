@@ -23,8 +23,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-const DEFAULT_MAX_ROUNDS: usize = 15;
-const MAX_MOVES_LIMIT: usize = 255;
+const MAX_ROUNDS: usize = 15;
+const MAX_MOVES: usize = 255;
 const PILE_STOCK: usize = 0;
 const PILE_WASTE: usize = 1;
 const PILE_FOUNDATION_START: usize = 2;
@@ -44,14 +44,12 @@ pub fn solve(board: Board, max_states: u32, minimal: bool) -> Result<SolveResult
 /// A struct representing the solver for the Solitaire game.
 #[derive(Debug, Clone)]
 pub struct Solver {
-    pub allow_foundation_to_tableau: bool,
-    pub max_rounds: usize,
     helper: TalonHelper,
     initial_board: Board,
     initial_piles: [Pile; PILE_SIZE],
     initial_foundation_score: u8,
     piles: [Pile; PILE_SIZE],
-    moves: [Move; MAX_MOVES_LIMIT],
+    moves: [Move; MAX_MOVES],
     suits_to_foundations: [usize; TOTAL_FOUNDATIONS],
     foundation_score: u8,
     foundation_minimum: u8,
@@ -69,8 +67,6 @@ impl Default for Solver {
 impl Solver {
     pub fn new() -> Self {
         Self {
-            allow_foundation_to_tableau: false,
-            max_rounds: DEFAULT_MAX_ROUNDS,
             helper: TalonHelper::new(),
             initial_board: Board::default(),
             initial_piles: std::array::from_fn(|_| Default::default()),
@@ -101,7 +97,7 @@ impl Solver {
         let mut node_count = 1;
         let mut max_foundation_score = 0;
         let mut possible_moves = PossibleMoves::new();
-        let mut moves_storage = [Move::default(); MAX_MOVES_LIMIT];
+        let mut moves_storage = [Move::default(); MAX_MOVES];
 
         let estimate = Estimate {
             current: 0,
@@ -110,7 +106,7 @@ impl Solver {
         closed.insert(self.get_state(), estimate);
         open.push(MoveIndex::new(node_count - 1, 0, estimate));
 
-        let mut best_solution_move_count = MAX_MOVES_LIMIT as u8;
+        let mut best_solution_move_count = MAX_MOVES as u8;
         let mut solution_node_index = None;
         let timer = Instant::now();
 
@@ -141,11 +137,10 @@ impl Solver {
                 let new_current = estimate.current.saturating_add(additional_moves);
                 let new_estimate = Estimate {
                     current: new_current,
-                    remaining: self.minimum_moves_remaining(self.round_count == self.max_rounds),
+                    remaining: self.minimum_moves_remaining(self.round_count == MAX_ROUNDS),
                 };
 
-                if new_estimate.total() < best_solution_move_count
-                    && self.round_count <= self.max_rounds
+                if new_estimate.total() < best_solution_move_count && self.round_count <= MAX_ROUNDS
                 {
                     let mut skip = false;
 
@@ -211,7 +206,7 @@ impl Solver {
             if node_count < max_nodes {
                 bail!("No solution found.");
             } else {
-                bail!("Unable to solve the game; Reached max states: {max_nodes}.");
+                bail!("Unable to solve the game; reached max states {max_nodes}.");
             }
         }
 
@@ -348,9 +343,7 @@ impl Solver {
         if self.compute_move_from_waste(possible_moves) {
             return;
         }
-        if self.allow_foundation_to_tableau {
-            self.compute_move_from_foundation(possible_moves);
-        }
+        self.compute_move_from_foundation(possible_moves);
     }
 
     fn compute_with_last_move(&mut self, possible_moves: &mut PossibleMoves) -> bool {
@@ -712,7 +705,7 @@ impl Solver {
                     board.move_tableau_to_tableau(from_idx, to_index, move_count);
                 }
             } else if (PILE_FOUNDATION_START..=PILE_FOUNDATION_END).contains(&move_from) {
-                let from_index = move_to - PILE_FOUNDATION_START;
+                let from_index = move_from - PILE_FOUNDATION_START;
                 if (PILE_TABLEAU_START..=PILE_TABLEAU_END).contains(&move_to) {
                     let to_index = move_to - PILE_TABLEAU_START;
                     actions.push(Action::FoundationToTableau(from_index, to_index));
