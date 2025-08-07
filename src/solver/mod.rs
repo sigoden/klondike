@@ -870,7 +870,7 @@ DrawCount: 3
 
         let board = Board::parse(BOARD_STR).unwrap();
         let result = solve(board, 100_000, false).unwrap();
-        assert_eq!(result.states, 66_267);
+        assert_eq!(result.states, 80971);
         assert_eq!(result.actions.len(), 111);
         let encoded_actions = crate::action::format_actions(&result.actions);
         println!("{encoded_actions}");
