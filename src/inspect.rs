@@ -72,15 +72,12 @@ impl Inspector {
     }
 
     fn read(&self) -> Result<Board> {
+        let mut board = Board::new();
         let pile_list = self.read_pile_list().context("Failed to read pile_list")?;
         let draw_count = self
             .read_draw_count()
             .context("Failed to read draw_count")?;
-
-        let mut board = Board {
-            draw_count: Some(draw_count as usize),
-            ..Default::default()
-        };
+        board.set_draw_count(draw_count as usize);
         for i in 0..TOTAL_FOUNDATIONS {
             let (cards, _) = self.read_pile(&pile_list.piles, TOTAL_FOUNDATIONS - 1 - i)?;
             board.foundations[i] = cards.last().cloned();
@@ -292,7 +289,7 @@ mod tests {
             true => {
                 let board = inspect().unwrap();
                 assert!(
-                    board.draw_count == Some(1) || board.draw_count == Some(3),
+                    board.draw_count() == 1 || board.draw_count() == 3,
                     "Draw count should be 1 or 3"
                 );
                 println!("{}", board.pretty_print());

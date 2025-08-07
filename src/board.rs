@@ -20,18 +20,18 @@ pub struct Board {
     pub waste: WastePile,
     pub foundations: [Option<Card>; TOTAL_FOUNDATIONS],
     pub tableaus: [Tableau; TOTAL_TABLEAUS],
-    pub draw_count: Option<usize>,
+    draw_count: usize,
 }
 
 impl Board {
-    pub fn new(draw_count: Option<usize>) -> Self {
+    pub fn new() -> Self {
         Self {
-            draw_count,
+            draw_count: 1,
             ..Default::default()
         }
     }
 
-    pub fn new_from_seed(seed: u32, draw_count: Option<usize>) -> Self {
+    pub fn new_from_seed(seed: u32) -> Self {
         let mut current_seed = seed;
         let mut rnd = || {
             current_seed = ((current_seed as u64 * 16807) % 0x7fffffff) as u32;
@@ -63,7 +63,7 @@ impl Board {
             }
         }
 
-        let mut board = Board::new(draw_count);
+        let mut board = Board::new();
 
         let mut m = 0;
         for j in 1..=TOTAL_TABLEAUS {
@@ -81,11 +81,11 @@ impl Board {
     }
 
     pub fn draw_count(&self) -> usize {
-        self.draw_count.unwrap_or(1)
+        if self.draw_count == 3 { 3 } else { 1 }
     }
 
     pub fn set_draw_count(&mut self, value: usize) {
-        self.draw_count = Some(value);
+        self.draw_count = value;
         self.waste.visible_count = self.waste.visible_count.min(value);
     }
 
@@ -273,12 +273,12 @@ impl Board {
                     board.tableaus[idx].cards.push(c);
                 }
             } else if let Some(rest) = line.strip_prefix("DrawCount:") {
-                board.draw_count = Some(
-                    rest.trim()
-                        .parse::<usize>()
-                        .context("Invalid DrawCount")
-                        .with_context(line_context)?,
-                );
+                let value = rest
+                    .trim()
+                    .parse::<usize>()
+                    .context("Invalid DrawCount")
+                    .with_context(line_context)?;
+                board.set_draw_count(value);
             }
         }
 
@@ -548,7 +548,7 @@ DrawCount: 3"#;
 
     #[test]
     fn test_new_board() {
-        let board = Board::new(None);
+        let board = Board::new();
         assert_eq!(board.draw_count(), 1);
         assert_eq!(board.foundation_score(), 0);
         assert!(!board.is_valid());
@@ -556,7 +556,7 @@ DrawCount: 3"#;
 
     #[test]
     fn test_new_from_seed() {
-        let board = Board::new_from_seed(670334786, Some(1));
+        let board = Board::new_from_seed(670334786);
         assert_eq!(board.draw_count(), 1);
         assert!(board.is_valid());
         println!("{}", board.pretty_print());
