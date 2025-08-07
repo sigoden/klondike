@@ -12,8 +12,7 @@ use self::move_::*;
 use self::pile::*;
 
 use crate::action::Action;
-use crate::board::Card;
-use crate::board::{Board, MAX_CARD, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
+use crate::board::{Board, Card, MAX_CARD, MAX_SUIT, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
 
 use ahash::AHasher;
 use anyhow::{Result, bail};
@@ -53,6 +52,7 @@ pub struct Solver {
     initial_foundation_score: u8,
     piles: [Pile; PILE_SIZE],
     moves: [Move; MAX_MOVES_LIMIT],
+    suits_to_foundations: [usize; TOTAL_FOUNDATIONS],
     foundation_score: u8,
     foundation_minimum: u8,
     last_move: Move,
@@ -79,6 +79,7 @@ impl Solver {
             moves: std::array::from_fn(|_| Default::default()),
             foundation_score: 0,
             foundation_minimum: 0,
+            suits_to_foundations: [MAX_SUIT as usize; TOTAL_FOUNDATIONS],
             last_move: Default::default(),
             moves_total: 0,
             round_count: 1,
@@ -542,7 +543,11 @@ impl Solver {
     }
 
     fn can_move_to_foundation(&self, card: CardExt) -> Option<u8> {
-        let idx = PILE_FOUNDATION_START + card.suit as usize;
+        let idx = if card.is_unknown() {
+            return None;
+        } else {
+            self.suits_to_foundations[card.suit as usize]
+        };
         match self.piles[idx].size == card.rank as usize {
             true => Some(idx as u8),
             false => None,
@@ -720,6 +725,8 @@ impl Solver {
 
     pub fn set_board(&mut self, board: Board) {
         let mut foundation_score = 0;
+        let mut foundation_slots: u8 = 0;
+        self.suits_to_foundations.fill(MAX_SUIT as usize);
 
         {
             let pile = &mut self.initial_piles[PILE_STOCK];
@@ -749,6 +756,20 @@ impl Solver {
             foundation_score += rank + 1;
             for j in 0..=rank {
                 pile.push_card(CardExt::new_with_rank_suit(j, suit));
+            }
+            self.suits_to_foundations[suit as usize] = PILE_FOUNDATION_START + i;
+            foundation_slots |= 1 << i
+        }
+
+        for i in 0..MAX_SUIT {
+            if self.suits_to_foundations[i as usize] == MAX_SUIT as usize {
+                for j in 0..TOTAL_FOUNDATIONS {
+                    if foundation_slots & (1 << j) == 0 {
+                        self.suits_to_foundations[i as usize] = PILE_FOUNDATION_START + j;
+                        foundation_slots |= 1 << j;
+                        break;
+                    }
+                }
             }
         }
 
