@@ -15,31 +15,6 @@ use std::{
     time::Duration,
 };
 
-const INSPECT_EXAMPLES: &str = r#"Examples:
-  # Extract game state from memory of Solitaire.exe (Windows only)
-  solitaire-solver inspect
-
-  # View https://greenfelt.net/klondike?game=283409412
-  solitaire-solver inspect -g 283409412
-
-  # View https://greenfelt.net/klondike3?game=283409412
-  solitaire-solver inspect -g 283409412 -d 3
-"#;
-
-const SOLVE_EXAMPLES: &str = r#"Examples:
-  # Solve the current running Solitaire.exe game (Windows only)
-  solitaire-solver solve
-
-  # Release the limit to 500 million states (about 8 GB of memory)
-  solitaire-solver solve -s 500000000
-
-  # Solve https://greenfelt.net/klondike?game=283409412
-  solitaire-solver solve -g 283409412
-
-  # Solve https://greenfelt.net/klondike3?game=283409412
-  solitaire-solver solve -g 283409412 -d 3
-"#;
-
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
@@ -49,48 +24,37 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Inspect the game state
-    #[command(after_help = INSPECT_EXAMPLES)]
-    Inspect {
-        /// Game ID from greenfelt.net/klondike
-        #[arg(short = 'g', long, value_name = "SEED")]
+    /// Solve the game
+    Solve {
+        /// Game ID from greenfelt.net/klondike (e.g. 283409412)
+        #[arg(short, long, value_name = "SEED")]
         greenfelt: Option<u32>,
         /// Cards drawn per turn (1 or 3)
-        #[arg(short = 'd', long, value_name = "NUM")]
-        draw_count: Option<usize>,
-        /// Write game state to a file instead of stdout
-        #[arg(short = 'o', long, value_name = "FILE")]
-        output: Option<PathBuf>,
-    },
-    /// Solve the game
-    #[command(after_help = SOLVE_EXAMPLES)]
-    Solve {
-        /// Maximum number of states to explore (~1 GB per 64 million states)
+        #[arg(short, long, value_name = "NUM")]
+        draw: Option<usize>,
+        /// Max states to explore (~1 GB per 64 million states)
         #[arg(short = 's', long, default_value_t = 100_000_000, value_name = "NUM")]
         max_states: u32,
-        /// Return early when any solution is found (not necessarily minimal)
-        #[arg(short = 'f', long)]
+        /// Stop at first found solution (may not be minimal)
+        #[arg(short, long)]
         fast: bool,
-        /// Game ID from greenfelt.net/klondike
-        #[arg(short = 'g', long, value_name = "SEED")]
-        greenfelt: Option<u32>,
-        /// Cards drawn per turn (1 or 3)
-        #[arg(short = 'd', long, value_name = "NUM")]
-        draw_count: Option<usize>,
-        /// Path to a saved game state file, typically generated via `inspect`
+        /// Preview initial game state without solving
+        #[arg(short, long)]
+        preview: bool,
+        /// Path to a game state file to solve
         file: Option<PathBuf>,
     },
     /// Automatically play the game
     #[cfg(windows)]
     Autoplay {
-        /// Maximum number of states to explore (~1 GB per 64 million states)
-        #[arg(short = 's', long, default_value_t = 100_000_000, value_name = "NUM")]
+        /// Max states to explore (~1 GB per 64 million states)
+        #[arg(short, long, default_value_t = 100_000_000, value_name = "NUM")]
         max_states: u32,
-        /// Return early when any solution is found (not necessarily minimal)
-        #[arg(short = 'f', long)]
+        /// Stop at first found solution (may not be minimal)
+        #[arg(short, long)]
         fast: bool,
         /// Delay between moves in milliseconds
-        #[arg(short = 'i', long, default_value_t = 3000, value_name = "MILLIS")]
+        #[arg(short, long, default_value_t = 3000, value_name = "MS")]
         interval: u64,
     },
 }
@@ -99,42 +63,12 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Inspect {
-            greenfelt,
-            draw_count,
-            output,
-        } => {
-            let mut board = if let Some(seed) = greenfelt {
-                Board::new_from_seed(*seed)
-            } else {
-                #[cfg(windows)]
-                {
-                    solitaire_solver::inspect::inspect()?
-                }
-                #[cfg(not(windows))]
-                {
-                    bail!("`--greenfelt` seed must be provided.");
-                }
-            };
-            if let Some(draw_count) = draw_count {
-                if *draw_count != 1 && *draw_count != 3 {
-                    bail!("Draw count must be 1 or 3.");
-                }
-                board.set_draw_count(*draw_count);
-            }
-            if let Some(file) = output {
-                std::fs::write(file, board.to_pretty_string())
-                    .context("Failed to write board to file")?;
-                println!("Game state written to '{}'", file.display());
-            } else {
-                println!("{}", board.to_pretty_string());
-            }
-        }
         Commands::Solve {
             max_states,
             fast,
+            preview,
             greenfelt,
-            draw_count,
+            draw,
             file,
         } => {
             let mut board = if let Some(file) = file {
@@ -155,14 +89,18 @@ fn main() -> Result<()> {
                 }
                 #[cfg(not(windows))]
                 {
-                    bail!("No game state `file` or `--greenfelt` seed provided.");
+                    bail!("No game state `file` or `--greenfelt` provided.");
                 }
             };
-            if let Some(draw_count) = draw_count {
+            if let Some(draw_count) = draw {
                 if *draw_count != 1 && *draw_count != 3 {
                     bail!("Draw count must be 1 or 3.");
                 }
                 board.set_draw_count(*draw_count);
+            }
+            if *preview {
+                println!("{}", board.to_pretty_string());
+                return Ok(());
             }
             let actions = do_solve(board, *max_states, !fast)?;
             println!("{}", format_actions(&actions));
