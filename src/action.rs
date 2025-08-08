@@ -63,10 +63,10 @@ pub fn format_actions(actions: &[Action]) -> String {
     }
 
     let mut output = String::new();
-    let max_width = list.iter().map(|s| s.len()).max().unwrap_or_default() + 1;
+    let column_width = list.iter().map(|s| s.len()).max().unwrap_or_default() + 1;
     for chunk in list.chunks(10) {
         for cmd in chunk {
-            output.push_str(&format!("{cmd:<width$}", width = max_width));
+            output.push_str(&format!("{cmd:<width$}", width = column_width));
         }
         output.push('\n');
     }
