@@ -857,21 +857,21 @@ mod tests {
 
     #[test]
     fn test_solve() {
-        const BOARD_STR: &str = r#"Stock: 2♠J♣J♠5♦8♥J♥3♦6♥4♦9♠5♣8♦9♦Q♠5♠4♥5♥J♦2♦3♣6♦8♠T♠A♠
-Tableau1: |7♣
-Tableau2: 6♣|2♥
-Tableau3: 2♣Q♣|4♣
-Tableau4: 3♥9♣9♥|T♥
-Tableau5: 8♣7♠4♠A♣|K♠
-Tableau6: T♦K♦A♥6♠K♣|Q♥
-Tableau7: 3♠7♦A♦K♥Q♦T♣|7♥
-DrawCount: 3
+        const BOARD_STR: &str = r#"Stock: 5♣3♣6♦Q♦A♠5♦K♠4♥5♥4♣7♠Q♣J♣6♠2♥2♣3♠9♥K♦7♦7♥J♠A♦8♣
+Tableau1: |9♦
+Tableau2: 7♣|9♣
+Tableau3: A♣2♠|3♦
+Tableau4: K♥T♠T♣|T♦
+Tableau5: 8♠Q♥6♥6♣|J♦
+Tableau6: 8♥Q♠5♠3♥K♣|4♦
+Tableau7: 8♦A♥9♠J♥2♦4♠|T♥
+DrawCount: 1
 "#;
 
         let board = Board::parse(BOARD_STR).unwrap();
-        let result = solve(board, 100_000, false).unwrap();
-        assert_eq!(result.states, 80971);
-        assert_eq!(result.actions.len(), 111);
+        let result = solve(board, 200_000, true).unwrap();
+        assert_eq!(result.states, 166066);
+        assert_eq!(result.actions.len(), 114);
         let encoded_actions = crate::action::format_actions(&result.actions);
         println!("{encoded_actions}");
     }
