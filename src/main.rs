@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use solitaire_solver::{
     action::{Action, format_actions},
@@ -6,7 +6,7 @@ use solitaire_solver::{
     solver::{SolveResult, solve},
 };
 use std::{
-    io::{IsTerminal, Write, stderr},
+    io::{IsTerminal, Read, Write, stderr, stdin},
     path::PathBuf,
     sync::{
         Arc,
@@ -19,11 +19,11 @@ const INSPECT_EXAMPLES: &str = r#"Examples:
   # Extract game state from memory of Solitaire.exe (Windows only)
   solitaire-solver inspect
 
-  # View https://greenfelt.net/klondike?game=670334786
-  solitaire-solver inspect -g 670334786
+  # View https://greenfelt.net/klondike?game=283409412
+  solitaire-solver inspect -g 283409412
 
-  # View https://greenfelt.net/klondike3?game=670334786
-  solitaire-solver inspect -g 670334786 -d 3
+  # View https://greenfelt.net/klondike3?game=283409412
+  solitaire-solver inspect -g 283409412 -d 3
 "#;
 
 const SOLVE_EXAMPLES: &str = r#"Examples:
@@ -33,11 +33,11 @@ const SOLVE_EXAMPLES: &str = r#"Examples:
   # Release the limit to 500 million states (about 8 GB of memory)
   solitaire-solver solve -s 500000000
 
-  # Solve https://greenfelt.net/klondike?game=670334786
-  solitaire-solver solve -g 670334786
+  # Solve https://greenfelt.net/klondike?game=283409412
+  solitaire-solver solve -g 283409412
 
-  # Solve https://greenfelt.net/klondike3?game=670334786
-  solitaire-solver solve -g 670334786 -d 3
+  # Solve https://greenfelt.net/klondike3?game=283409412
+  solitaire-solver solve -g 283409412 -d 3
 "#;
 
 #[derive(Parser)]
@@ -90,7 +90,7 @@ enum Commands {
         #[arg(short = 'f', long)]
         fast: bool,
         /// Delay between moves in milliseconds
-        #[arg(short, long, default_value_t = 3000, value_name = "MILLIS")]
+        #[arg(short = 'i', long, default_value_t = 3000, value_name = "MILLIS")]
         interval: u64,
     },
 }
@@ -124,7 +124,7 @@ fn main() -> Result<()> {
             }
             if let Some(file) = output {
                 std::fs::write(file, board.pretty_print())
-                    .map_err(|err| anyhow!("Failed to write board to file; {err}"))?;
+                    .context("Failed to write board to file")?;
                 println!("Game state written to '{}'", file.display());
             } else {
                 println!("{}", board.pretty_print());
@@ -139,9 +139,15 @@ fn main() -> Result<()> {
         } => {
             let mut board = if let Some(file) = file {
                 let content = std::fs::read_to_string(file)?;
-                Board::parse(&content).map_err(|err| anyhow!("Failed to parse board; {err}"))?
+                Board::parse(&content).context("Failed to parse board")?
             } else if let Some(seed) = greenfelt {
                 Board::new_from_seed(*seed)
+            } else if !stdin().is_terminal() {
+                let mut content = String::new();
+                stdin()
+                    .read_to_string(&mut content)
+                    .context("Failed to read from stdin")?;
+                Board::parse(&content).context("Failed to parse board")?
             } else {
                 #[cfg(windows)]
                 {
@@ -149,7 +155,7 @@ fn main() -> Result<()> {
                 }
                 #[cfg(not(windows))]
                 {
-                    bail!("Either a game state `file` or `--greenfelt` seed must be provided.");
+                    bail!("No game state `file` or `--greenfelt` seed provided.");
                 }
             };
             if let Some(draw_count) = draw_count {
@@ -170,7 +176,7 @@ fn main() -> Result<()> {
             let board = solitaire_solver::inspect::inspect()?;
             let actions = do_solve(board.clone(), *max_states, !fast)?;
             solitaire_solver::autoplay::autoplay(board, actions, *interval)
-                .map_err(|err| anyhow!("Autoplay failed; {err}"))?;
+                .context("Failed to autoplay the game")?;
         }
     }
 
@@ -188,10 +194,10 @@ fn do_solve(board: Board, max_states: u32, minimal: bool) -> Result<Vec<Action>>
     } = with_spinner("Solving the game...", move || {
         solve(board, max_states, minimal)
     })?;
-    let actions_count = actions.len();
+    let total_actions = actions.len();
     let redeal_count = actions.iter().filter(|a| a.is_redeal()).count();
     let elapsed_str = format_elapsed(elapsed);
-    let mut steps_str = format!("{actions_count} Moves");
+    let mut steps_str = format!("{} Moves", total_actions - redeal_count);
     if redeal_count > 0 {
         steps_str.push_str(&format!(", {redeal_count} Redeal"));
         if redeal_count > 1 {
