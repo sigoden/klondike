@@ -37,10 +37,16 @@ impl Board {
             current_seed = ((current_seed as u64 * 16807) % 0x7fffffff) as u32;
             current_seed
         };
-        let mut deck = [Card::UNKNOWN; 52];
-        for (i, id) in (0..26).chain(39..52).chain(26..39).enumerate() {
-            deck[i] = Card::new_with_id(id as u8);
-        }
+        let mut deck: [Card; 52] = std::array::from_fn(|i| {
+            let card = Card::new_with_id(i as u8);
+            if card.suit() == 0 {
+                Card::new_with_rank_suit(card.rank(), 1)
+            } else if card.suit() == 1 {
+                Card::new_with_rank_suit(card.rank(), 0)
+            } else {
+                card
+            }
+        });
 
         for _ in 0..7 {
             for j in 0..52 {
@@ -556,9 +562,20 @@ DrawCount: 3"#;
 
     #[test]
     fn test_new_from_seed() {
-        let board = Board::new_from_seed(670334786);
+        let board = Board::new_from_seed(283409412);
         assert_eq!(board.draw_count(), 1);
         assert!(board.is_valid());
-        println!("{}", board.pretty_print());
+        assert_eq!(
+            r#"Stock: 4♦A♥3♦8♣7♥8♠7♠5♦6♥Q♣3♠9♦9♠5♣K♠8♥2♠2♣J♠T♠4♠8♦7♦6♣
+Tableau1: |K♦
+Tableau2: Q♥|4♥
+Tableau3: 9♥T♣|Q♦
+Tableau4: 6♠J♦5♥|3♣
+Tableau5: Q♠A♦K♥J♣|6♦
+Tableau6: 2♥J♥3♥A♠5♠|T♦
+Tableau7: 4♣T♥7♣K♣2♦9♣|A♣
+DrawCount: 1"#,
+            board.pretty_print()
+        );
     }
 }
