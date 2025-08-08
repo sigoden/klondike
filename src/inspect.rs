@@ -292,7 +292,7 @@ mod tests {
                     board.draw_count() == 1 || board.draw_count() == 3,
                     "Draw count should be 1 or 3"
                 );
-                println!("{}", board.pretty_print());
+                println!("{}", board.to_pretty_string());
             }
             false => {
                 eprintln!("Solitaire is not running.");

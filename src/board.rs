@@ -310,14 +310,14 @@ impl Board {
         Ok(cards)
     }
 
-    pub fn pretty_print(&self) -> String {
+    pub fn to_pretty_string(&self) -> String {
         let mut output = String::new();
 
         // Stock
         if !self.stock.is_empty() {
             output.push_str("Stock: ");
             for card in &self.stock {
-                output.push_str(&card.pretty_print());
+                output.push_str(&card.to_pretty_string());
             }
             output.push('\n');
         }
@@ -332,7 +332,7 @@ impl Board {
                 if i == sep && vis > 0 {
                     output.push('|');
                 }
-                output.push_str(&card.pretty_print());
+                output.push_str(&card.to_pretty_string());
             }
             output.push('\n');
         }
@@ -340,7 +340,11 @@ impl Board {
         // Foundations
         for (i, card) in self.foundations.iter().enumerate() {
             if let Some(card) = card {
-                output.push_str(&format!("Foundation{}: {}\n", i + 1, card.pretty_print()));
+                output.push_str(&format!(
+                    "Foundation{}: {}\n",
+                    i + 1,
+                    card.to_pretty_string()
+                ));
             }
         }
 
@@ -357,7 +361,7 @@ impl Board {
                 if j == sep && face_up > 0 {
                     output.push('|');
                 }
-                output.push_str(&card.pretty_print());
+                output.push_str(&card.to_pretty_string());
             }
             output.push('\n');
         }
@@ -513,7 +517,7 @@ impl Card {
         self.0 / MAX_RANK
     }
 
-    pub fn pretty_print(&self) -> String {
+    pub fn to_pretty_string(&self) -> String {
         format!(
             "{}{}",
             RANKS[self.rank() as usize],
@@ -549,7 +553,7 @@ DrawCount: 3"#;
 
         let board = Board::parse(BOARD_STR).unwrap();
         assert!(board.is_valid());
-        assert_eq!(BOARD_STR, board.pretty_print());
+        assert_eq!(BOARD_STR, board.to_pretty_string());
     }
 
     #[test]
@@ -575,7 +579,7 @@ Tableau5: Q♠A♦K♥J♣|6♦
 Tableau6: 2♥J♥3♥A♠5♠|T♦
 Tableau7: 4♣T♥7♣K♣2♦9♣|A♣
 DrawCount: 1"#,
-            board.pretty_print()
+            board.to_pretty_string()
         );
     }
 }
