@@ -8,7 +8,7 @@ pub const MAX_RANK: u8 = 13;
 pub const MAX_SUIT: u8 = 4;
 pub const MAX_CARD: u8 = MAX_SUIT * MAX_RANK;
 
-const SUITS: [char; 5] = ['♣', '♦', '♠', '♥', '?'];
+const SUITS: [char; 5] = ['♦', '♣', '♥', '♠', '?'];
 const RANKS: [char; 14] = [
     'A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', '?',
 ];

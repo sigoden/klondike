@@ -242,10 +242,10 @@ fn parse_card(card_str: &str) -> Option<Card> {
     };
     let suit_str = parts.next()?;
     let suit = match suit_str.trim() {
-        "Clubs" => 0,
-        "Diamonds" => 1,
-        "Spades" => 2,
-        "Hearts" => 3,
+        "Diamonds" => 0,
+        "Clubs" => 1,
+        "Hearts" => 2,
+        "Spades" => 3,
         _ => return None,
     };
     Some(Card::new_with_rank_suit(rank, suit))
