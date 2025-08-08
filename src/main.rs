@@ -123,11 +123,11 @@ fn main() -> Result<()> {
                 board.set_draw_count(*draw_count);
             }
             if let Some(file) = output {
-                std::fs::write(file, board.pretty_print())
+                std::fs::write(file, board.to_pretty_string())
                     .context("Failed to write board to file")?;
                 println!("Game state written to '{}'", file.display());
             } else {
-                println!("{}", board.pretty_print());
+                println!("{}", board.to_pretty_string());
             }
         }
         Commands::Solve {
@@ -184,7 +184,7 @@ fn main() -> Result<()> {
 }
 
 fn do_solve(board: Board, max_states: u32, minimal: bool) -> Result<Vec<Action>> {
-    let board_str = board.pretty_print();
+    let board_str = board.to_pretty_string();
     println!("{board_str}\n");
     let SolveResult {
         actions,

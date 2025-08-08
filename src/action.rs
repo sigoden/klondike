@@ -63,9 +63,10 @@ pub fn format_actions(actions: &[Action]) -> String {
     }
 
     let mut output = String::new();
+    let max_width = list.iter().map(|s| s.len()).max().unwrap_or_default() + 1;
     for chunk in list.chunks(10) {
         for cmd in chunk {
-            output.push_str(&format!("{cmd:<8}"));
+            output.push_str(&format!("{cmd:<width$}", width = max_width));
         }
         output.push('\n');
     }
@@ -98,7 +99,7 @@ pub fn apply_action(board: &mut Board, action: &Action) {
 
 pub fn describe_action(board: &Board, action: &Action) -> String {
     let format_card =
-        |card: Option<&Card>| -> String { card.map(|c| c.pretty_print()).unwrap_or_default() };
+        |card: Option<&Card>| -> String { card.map(|c| c.to_pretty_string()).unwrap_or_default() };
 
     match action {
         Action::WasteToFoundation(foundation_index) => {
@@ -141,7 +142,7 @@ pub fn describe_action(board: &Board, action: &Action) -> String {
             let from_cards = from_tableau_cards
                 .iter()
                 .skip(from_tableau_cards.len() - count)
-                .map(|c| c.pretty_print())
+                .map(|c| c.to_pretty_string())
                 .collect::<Vec<_>>()
                 .join("");
             let to_card = format_card(board.tableaus[*to_index].peek_top());
