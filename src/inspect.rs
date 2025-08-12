@@ -1,6 +1,6 @@
 //! Reads the memory of the Solitaire process to extract the game state.
 
-use crate::board::{Board, Card, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS, Tableau, WastePile};
+use crate::board::{Board, Card, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS, Tableau};
 
 use anyhow::{Context, Result, anyhow, bail};
 use std::ffi::{OsStr, OsString};
@@ -90,8 +90,8 @@ impl Inspector {
         let (stock_cards, _) = self.read_pile(&pile_list.piles, STOCK_PILE_INDEX)?;
         board.stock = stock_cards.into_iter().collect();
 
-        let (waste_cards, visible_count) = self.read_pile(&pile_list.piles, WASTE_PILE_INDEX)?;
-        board.waste = WastePile::new(waste_cards, visible_count);
+        let (waste_cards, _) = self.read_pile(&pile_list.piles, WASTE_PILE_INDEX)?;
+        board.waste = waste_cards.into_iter().collect();
 
         Ok(board)
     }
