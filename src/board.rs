@@ -17,7 +17,7 @@ const TABLEAU_SIZE: usize = 19;
 #[derive(Debug, Clone, Default)]
 pub struct Board {
     pub stock: SmallVec<[Card; TALON_SIZE]>,
-    pub waste: WastePile,
+    pub waste: SmallVec<[Card; TALON_SIZE]>,
     pub foundations: [Option<Card>; TOTAL_FOUNDATIONS],
     pub tableaus: [Tableau; TOTAL_TABLEAUS],
     draw_count: usize,
@@ -92,7 +92,6 @@ impl Board {
 
     pub fn set_draw_count(&mut self, value: usize) {
         self.draw_count = value;
-        self.waste.visible_count = self.waste.visible_count.min(value);
     }
 
     pub fn foundation_score(&self) -> u8 {
@@ -131,7 +130,7 @@ impl Board {
         if !check_cards(&self.stock) {
             return false;
         }
-        if !check_cards(&self.waste.cards) {
+        if !check_cards(&self.waste) {
             return false;
         }
         for &card in &self.foundations {
@@ -161,25 +160,23 @@ impl Board {
         let stock_len = self.stock.len();
         if stock_len == 0 {
             if !self.waste.is_empty() {
-                self.stock.extend(self.waste.cards.drain(..).rev());
-                self.waste.visible_count = 0;
+                self.stock.extend(self.waste.drain(..).rev());
             }
         } else {
             let draw_count = self.draw_count();
             let num = draw_count.min(stock_len);
             let iter = self.stock.drain(self.stock.len() - num..).rev();
-            self.waste.cards.extend(iter);
-            self.waste.visible_count = num.max(1);
+            self.waste.extend(iter);
         }
     }
 
     pub fn move_waste_to_foundation(&mut self, idx: usize) {
-        let card = self.waste.pop_unchecked();
+        let card = self.waste.pop().unwrap_or_default();
         self.foundations[idx] = Some(card);
     }
 
     pub fn move_waste_to_tableau(&mut self, idx: usize) {
-        let card = self.waste.pop_unchecked();
+        let card = self.waste.pop().unwrap_or_default();
         self.tableaus[idx].push(card);
     }
 
@@ -238,9 +235,8 @@ impl Board {
                 };
                 let cards = Self::parse_cards(before.trim()).with_context(line_context)?;
                 let visible_cards = Self::parse_cards(after.trim()).with_context(line_context)?;
-                board.waste.visible_count = visible_cards.len();
                 for c in [cards, visible_cards].concat() {
-                    board.waste.cards.push(c);
+                    board.waste.push(c);
                 }
             } else if let Some(rest) = line.strip_prefix("Foundation") {
                 let mut parts = rest.splitn(2, ':');
@@ -325,13 +321,7 @@ impl Board {
         // Waste
         if !self.waste.is_empty() {
             output.push_str("Waste: ");
-            let waste_len = self.waste.cards.len();
-            let vis = self.waste.visible_count.min(waste_len);
-            let sep = waste_len.saturating_sub(vis);
-            for (i, card) in self.waste.cards.iter().enumerate() {
-                if i == sep && vis > 0 {
-                    output.push('|');
-                }
+            for card in &self.waste {
                 output.push_str(&card.to_pretty_string());
             }
             output.push('\n');
@@ -370,47 +360,6 @@ impl Board {
         output.push_str(&format!("DrawCount: {}", self.draw_count()));
 
         output
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct WastePile {
-    pub cards: SmallVec<[Card; TALON_SIZE]>,
-    pub visible_count: usize,
-}
-
-impl WastePile {
-    pub fn new(cards: Vec<Card>, visible_count: usize) -> Self {
-        Self {
-            cards: cards.into_iter().collect(),
-            visible_count,
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.cards.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.cards.len()
-    }
-
-    pub fn peek_top(&self) -> Option<&Card> {
-        self.cards.last()
-    }
-
-    pub fn pop_unchecked(&mut self) -> Card {
-        match self.cards.pop() {
-            Some(card) => {
-                if self.cards.is_empty() {
-                    self.visible_count = 0;
-                } else {
-                    self.visible_count = 1.max(self.visible_count - 1);
-                }
-                card
-            }
-            None => Card::UNKNOWN,
-        }
     }
 }
 
@@ -539,7 +488,7 @@ mod tests {
     #[test]
     fn test_parse_board() {
         const BOARD_STR: &str = r#"Stock: 5♦2♥8♦K♣7♥J♣
-Waste: 7♦Q♥K♥T♦6♣9♥K♦J♠T♣Q♣3♣2♦Q♦8♥6♥|7♠8♠
+Waste: 7♦Q♥K♥T♦6♣9♥K♦J♠T♣Q♣3♣2♦Q♦8♥6♥7♠8♠
 Foundation1: 2♣
 Foundation3: A♠
 Tableau1: |5♣

@@ -52,7 +52,7 @@ fn play_action(
         Action::WasteToFoundation(foundation_index) => {
             mouse_move(
                 enigo,
-                window.waste_point(board.waste.visible_count),
+                window.waste_point(),
                 window.foundation_point(*foundation_index),
             )?;
         }
@@ -60,7 +60,7 @@ fn play_action(
             let tableau = &board.tableaus[*tableau_index];
             mouse_move(
                 enigo,
-                window.waste_point(board.waste.visible_count),
+                window.waste_point(),
                 window.move_to_tableau_point(
                     *tableau_index,
                     tableau.cards.len(),

@@ -52,11 +52,9 @@ impl Window {
         self.transform(STOCK_CENTER_X, STOCK_CLICK_Y)
     }
 
-    pub fn waste_point(&self, uncovered_count: usize) -> Point {
+    pub fn waste_point(&self) -> Point {
         self.transform(
-            STOCK_CENTER_X
-                + TABLEAU_OFFSET_X
-                + (uncovered_count.saturating_sub(1)) as i32 * WASTE_OFFSET_X,
+            STOCK_CENTER_X + TABLEAU_OFFSET_X + WASTE_OFFSET_X,
             STOCK_CLICK_Y,
         )
     }
@@ -228,8 +226,8 @@ mod tests {
         );
         assert_eq!(window.stock_point(), (191, 185), "Stock point mismatch");
         assert_eq!(
-            window.waste_point(3),
-            (531, 185),
+            window.waste_point(),
+            (494, 185),
             "Waste (3th) point mismatch"
         );
         assert_eq!(

@@ -732,7 +732,7 @@ impl Solver {
         {
             let pile = &mut self.initial_piles[PILE_WASTE];
             pile.reset();
-            for card in board.waste.cards.iter() {
+            for card in board.waste.iter() {
                 pile.push_card(card.into());
             }
         }
@@ -794,12 +794,8 @@ impl Solver {
         {
             let waste_pile = &self.piles[PILE_WASTE];
             for i in 0..waste_pile.size {
-                board
-                    .waste
-                    .cards
-                    .push(Card::new_with_id(waste_pile.get(i).id));
+                board.waste.push(Card::new_with_id(waste_pile.get(i).id));
             }
-            board.waste.visible_count = 1;
         }
 
         for i in 0..TOTAL_FOUNDATIONS {

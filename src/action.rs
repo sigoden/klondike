@@ -103,7 +103,7 @@ pub fn describe_action(board: &Board, action: &Action) -> String {
 
     match action {
         Action::WasteToFoundation(foundation_index) => {
-            let from_card = format_card(board.waste.peek_top());
+            let from_card = format_card(board.waste.last());
             let to_card = format_card(board.foundations[*foundation_index].as_ref());
             format!(
                 "(Waste) {from_card} -> (Foundation{}) {to_card}",
@@ -111,7 +111,7 @@ pub fn describe_action(board: &Board, action: &Action) -> String {
             )
         }
         Action::WasteToTableau(tableau_index) => {
-            let from_card = format_card(board.waste.peek_top());
+            let from_card = format_card(board.waste.last());
             let to_card = format_card(board.tableaus[*tableau_index].peek_top());
             format!(
                 "(Waste) {from_card} -> (Tableau{}) {to_card}",
@@ -155,7 +155,7 @@ pub fn describe_action(board: &Board, action: &Action) -> String {
         Action::Draw => {
             let mut board = board.clone();
             board.draw();
-            let card = format_card(board.waste.peek_top());
+            let card = format_card(board.waste.last());
             format!("Draw {card}",)
         }
         Action::Redeal => "Redeal".to_string(),
