@@ -1,18 +1,7 @@
-//! This module contains the core logic for solving Solitaire games using the A* search algorithm.
-//!
-/// Migrated from the https://github.com/ShootMe/MinimalKlondike/blob/8983a1375aa15c5ca7f8c3df054aef37218f85c8/Entities/Board.cs
-mod card;
-mod helper;
-mod move_;
-mod pile;
+use super::*;
 
-use self::card::*;
-use self::helper::*;
-use self::move_::*;
-use self::pile::*;
-
-use crate::action::Action;
-use crate::board::{Board, Card, MAX_CARD, MAX_SUIT, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
+use klondike_common::action::Action;
+use klondike_common::board::{Board, Card, MAX_CARD, MAX_SUIT, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS};
 
 use ahash::AHasher;
 use anyhow::{Result, bail};
@@ -868,7 +857,7 @@ DrawCount: 1
         let result = solve(board, 200_000, true).unwrap();
         assert_eq!(result.states, 166066);
         assert_eq!(result.actions.len(), 114);
-        let encoded_actions = crate::action::format_actions(&result.actions);
+        let encoded_actions = klondike_common::action::format_actions(&result.actions);
         println!("{encoded_actions}");
     }
 }

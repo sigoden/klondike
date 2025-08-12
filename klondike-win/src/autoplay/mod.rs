@@ -4,14 +4,14 @@ mod window;
 
 use self::window::*;
 
-use crate::{
-    action::{Action, apply_action, describe_action},
-    board::Board,
-    inspect::get_pid,
-};
+use crate::inspect::get_pid;
 
 use anyhow::{Context, Result, anyhow, bail};
 use enigo::{Button, Coordinate, Direction, Enigo, Mouse, Settings, set_dpi_awareness};
+use klondike_common::{
+    action::{Action, apply_action, describe_action},
+    board::Board,
+};
 use std::{thread::sleep, time::Duration};
 
 pub fn autoplay(mut board: Board, actions: Vec<Action>, interval: u64) -> Result<()> {

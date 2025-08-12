@@ -1,4 +1,4 @@
-use crate::board::{Card, MAX_CARD, MAX_RANK, MAX_SUIT};
+use klondike_common::board::{Card, MAX_CARD, MAX_RANK, MAX_SUIT};
 
 // CardExt is an extended representation of Card that includes computed properties for performance optimization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

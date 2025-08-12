@@ -1,0 +1,25 @@
+[package]
+name = "klondike-cli"
+version = "0.1.0"
+description = "Command-line interface for Klondike Solitaire"
+edition = "2024"
+
+[[bin]]
+name = "klondike-solver"
+path = "src/solver.rs"
+
+[[bin]]
+name = "klondike-win"
+path = "src/win.rs"
+
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.42", features = ["derive"] }
+
+klondike-common = { path = "../klondike-common" }
+klondike-solver = { path = "../klondike-solver" }
+
+
+[target.'cfg(windows)'.dependencies]
+klondike-win = { path = "../klondike-win" }

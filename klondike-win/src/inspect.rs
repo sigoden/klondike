@@ -1,6 +1,6 @@
 //! Reads the memory of the Solitaire process to extract the game state.
 
-use crate::board::{Board, Card, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS, Tableau};
+use klondike_common::board::{Board, Card, TOTAL_FOUNDATIONS, TOTAL_TABLEAUS, Tableau};
 
 use anyhow::{Context, Result, anyhow, bail};
 use std::ffi::{OsStr, OsString};
