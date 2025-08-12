@@ -1,4 +1,6 @@
-use crate::{board::TALON_SIZE, solver::card::CardExt};
+use super::*;
+
+use klondike_common::board::TALON_SIZE;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Pile {

@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::board::TALON_SIZE;
+use klondike_common::board::TALON_SIZE;
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub struct Estimate {

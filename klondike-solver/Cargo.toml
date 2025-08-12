@@ -1,0 +1,12 @@
+[package]
+name = "klondike-solver"
+version = "0.1.0"
+description = "A blazing-fast solver for Klondike Solitaire"
+edition = "2024"
+
+[dependencies]
+ahash = "0.8.12"
+anyhow = "1.0.98"
+smallvec = "1.15.1"
+
+klondike-common = { path = "../klondike-common" }
