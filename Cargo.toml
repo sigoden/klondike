@@ -1,8 +1,9 @@
 [workspace]
-members = [ 
+members = [
     "klondike-cli", 
     "klondike-common",
     "klondike-solver", 
     "klondike-win", 
+    "klondike-app", 
 ]
 resolver = "3"
