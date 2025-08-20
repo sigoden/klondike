@@ -114,11 +114,10 @@ impl eframe::App for KlondikeApp {
 
         self.score = self.board.score();
         let is_win = self.score == 52;
-        if is_win {
-            if self.end_time.is_none() {
+        if is_win
+            && self.end_time.is_none() {
                 self.end_time = Some(ctx.input(|i| i.time));
             }
-        }
 
         if self.autoplay {
             self.handle_autoplay(ctx);
@@ -492,7 +491,9 @@ impl KlondikeApp {
                 } else {
                     ctx.input(|i| i.time) - self.start_time
                 };
-                ui.label(format!("Time: {:.0}s", time));
+                let minutes = (time / 60.0).floor() as u32;
+                let seconds = (time % 60.0).floor() as u32;
+                ui.label(format!("Time: {:02}:{:02}", minutes.min(99), seconds));
             });
         });
     }
