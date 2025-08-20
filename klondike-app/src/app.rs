@@ -131,19 +131,7 @@ impl eframe::App for KlondikeApp {
             self.return_dragged_cards();
         }
 
-        if self.score == 52 {
-            self.popup_win(ctx);
-        } else {
-            match self.autofinish {
-                Autofinish::Asking => {
-                    self.popup_autofinish(ctx);
-                }
-                Autofinish::InProgress => {
-                    self.autofinish_step(ctx);
-                }
-                _ => {}
-            }
-        }
+        self.handle_autofinish(ctx);
 
         ctx.request_repaint();
     }
@@ -793,22 +781,25 @@ impl KlondikeApp {
         }
     }
 
-    fn popup_win(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Victory")
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-            .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.label("Congratulations, you won the game!");
-                    if ui.button("Play Again").clicked() {
-                        self.renew();
-                    }
-                });
-            });
+    fn handle_autofinish(&mut self, ctx: &egui::Context) {
+        if self.score == 52 {
+            if self.autofinish == Autofinish::InProgress {
+                self.autofinish = Autofinish::Succeed;
+            }
+        } else {
+            match self.autofinish {
+                Autofinish::Asking => {
+                    self.show_autofinish_confirmation(ctx);
+                }
+                Autofinish::InProgress => {
+                    self.perform_autofinish_step(ctx);
+                }
+                _ => {}
+            }
+        }
     }
 
-    fn popup_autofinish(&mut self, ctx: &egui::Context) {
+    fn show_autofinish_confirmation(&mut self, ctx: &egui::Context) {
         egui::Window::new("Autofinish")
             .collapsible(false)
             .resizable(false)
@@ -841,7 +832,7 @@ impl KlondikeApp {
     }
 
     /// Perform one autofinish step
-    fn autofinish_step(&mut self, ctx: &egui::Context) {
+    fn perform_autofinish_step(&mut self, ctx: &egui::Context) {
         let waste_len = self.board.waste.len();
         if waste_len > 0 && self.try_auto_move_to_foundation(ctx, PileId::Waste, waste_len - 1) {
             return;
@@ -855,8 +846,6 @@ impl KlondikeApp {
                 return;
             }
         }
-
-        self.autofinish = Autofinish::Succeed;
     }
 
     fn handle_autoplay(&mut self, ctx: &egui::Context) {
@@ -964,7 +953,7 @@ impl KlondikeApp {
                 self.end_time = Some(ctx.input(|i| i.time));
             }
         } else if !self.autoplay
-            && matches!(self.autofinish, Autofinish::Idle)
+            && self.autofinish == Autofinish::Idle
             && self.board.can_autofinish()
         {
             self.autofinish = Autofinish::Asking;
