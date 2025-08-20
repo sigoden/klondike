@@ -26,9 +26,10 @@ pub struct KlondikeApp {
     history: Vec<GameMove>,
     redo_stack: Vec<GameMove>,
     autofinish: Autofinish,
-    has_card_moved: bool,
+    hook_moved: bool,
     score: u8,
     start_time: f64,
+    end_time: Option<f64>,
     autoplay: bool,
     next_play_time: f64,
 }
@@ -111,9 +112,13 @@ impl eframe::App for KlondikeApp {
             return;
         }
 
+        if self.hook_moved {
+            self.handle_moved(ctx);
+        }
+
         if self.autoplay {
-            self.score = self.board.score();
             self.handle_autoplay(ctx);
+            ctx.request_repaint();
             return;
         }
 
@@ -126,15 +131,9 @@ impl eframe::App for KlondikeApp {
             self.return_dragged_cards();
         }
 
-        if self.has_card_moved {
-            self.score = self.board.score();
-            if self.score == 52 {
-                self.handle_win(ctx);
-            } else {
-                self.handle_autofinish(ctx);
-            }
-            self.has_card_moved = false;
-        }
+        self.handle_autofinish(ctx);
+
+        ctx.request_repaint();
     }
 }
 
@@ -159,9 +158,10 @@ impl KlondikeApp {
             redo_stack: Vec::new(),
 
             autofinish: Autofinish::Idle,
-            has_card_moved: false,
+            hook_moved: false,
             score: 0,
             start_time: 0.0,
+            end_time: None,
 
             autoplay: false,
             next_play_time: 0.0,
@@ -192,7 +192,7 @@ impl KlondikeApp {
     /// Draw a card in the specified rectangle
     fn paint_card(painter: &egui::Painter, rect: Rect, card: &Card) {
         let bg_color = if card.face_up {
-            Color32::WHITE
+            Color32::from_gray(248)
         } else {
             Color32::from_rgb(0, 128, 128)
         };
@@ -200,7 +200,7 @@ impl KlondikeApp {
         painter.rect_stroke(
             rect,
             CornerRadius::same(5),
-            Stroke::new(1.0, Color32::BLACK),
+            Stroke::new(1.0, Color32::from_gray(100)),
             StrokeKind::Inside,
         );
 
@@ -283,19 +283,8 @@ impl KlondikeApp {
         let painter = ui.painter_at(rect);
         if self.board.stock.is_empty() {
             Self::paint_empty_pile(&painter, rect);
-            painter.circle_stroke(
-                rect.center(),
-                15.0,
-                Stroke::new(2.0, Color32::from_gray(100)),
-            );
         } else {
             Self::paint_card(&painter, rect, &Card::new_with_id(0));
-            painter.rect_stroke(
-                rect,
-                CornerRadius::same(5),
-                Stroke::new(2.0, Color32::YELLOW),
-                StrokeKind::Inside,
-            );
         }
     }
 
@@ -486,8 +475,14 @@ impl KlondikeApp {
                 ui.separator();
                 ui.label(format!("Moves: {}", self.history.len()));
                 ui.separator();
-                let time = ctx.input(|i| i.time) - self.start_time;
-                ui.label(format!("Time: {:.0}s", time));
+                let time = if let Some(end_time) = self.end_time {
+                    end_time - self.start_time
+                } else {
+                    ctx.input(|i| i.time) - self.start_time
+                };
+                let minutes = (time / 60.0).floor() as u32;
+                let seconds = (time % 60.0).floor() as u32;
+                ui.label(format!("Time: {:02}:{:02}", minutes.min(99), seconds));
             });
         });
     }
@@ -541,7 +536,7 @@ impl KlondikeApp {
             self.animations.remove(idx);
         }
 
-        self.has_card_moved = true;
+        self.hook_moved = true;
     }
 
     /// Apply a move and record it in history
@@ -765,7 +760,7 @@ impl KlondikeApp {
                 self.dragged_cards.clear();
                 self.drag_source = None;
 
-                self.has_card_moved = true;
+                self.hook_moved = true;
             }
             _ => {
                 self.return_dragged_cards();
@@ -786,69 +781,58 @@ impl KlondikeApp {
         }
     }
 
-    fn handle_win(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Victory")
+    fn handle_autofinish(&mut self, ctx: &egui::Context) {
+        if self.score == 52 {
+            if self.autofinish == Autofinish::InProgress {
+                self.autofinish = Autofinish::Succeed;
+            }
+        } else {
+            match self.autofinish {
+                Autofinish::Asking => {
+                    self.show_autofinish_confirmation(ctx);
+                }
+                Autofinish::InProgress => {
+                    self.perform_autofinish_step(ctx);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn show_autofinish_confirmation(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Autofinish")
             .collapsible(false)
             .resizable(false)
+            .fixed_size([360.0, 60.0])
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.label("Congratulations, you won the game!");
-                    if ui.button("Play Again").clicked() {
-                        self.renew();
-                    }
+                ui.label("All cards are face up and in order, do you want to autofinish?");
+                ui.add_space(10.0);
+                ui.columns(2, |columns| {
+                    columns[0].with_layout(
+                        egui::Layout::right_to_left(egui::Align::Center),
+                        |ui| {
+                            ui.add_space(40.);
+                            if ui.button("Yes").clicked() {
+                                self.autofinish = Autofinish::InProgress;
+                            }
+                        },
+                    );
+                    columns[1].with_layout(
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            ui.add_space(40.);
+                            if ui.button("No").clicked() {
+                                self.autofinish = Autofinish::Rejected;
+                            }
+                        },
+                    );
                 });
             });
     }
 
-    fn handle_autofinish(&mut self, ctx: &egui::Context) {
-        match self.autofinish {
-            Autofinish::Idle => {
-                if self.board.can_autofinish() {
-                    self.autofinish = Autofinish::Asking;
-                }
-            }
-            Autofinish::Asking => {
-                egui::Window::new("Autofinish")
-                    .collapsible(false)
-                    .resizable(false)
-                    .fixed_size([360.0, 60.0])
-                    .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                    .show(ctx, |ui| {
-                        ui.label("All cards are face up and in order, do you want to autofinish?");
-                        ui.add_space(10.0);
-                        ui.columns(2, |columns| {
-                            columns[0].with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    ui.add_space(40.);
-                                    if ui.button("Yes").clicked() {
-                                        self.autofinish = Autofinish::InProgress;
-                                    }
-                                },
-                            );
-                            columns[1].with_layout(
-                                egui::Layout::left_to_right(egui::Align::Center),
-                                |ui| {
-                                    ui.add_space(40.);
-                                    if ui.button("No").clicked() {
-                                        self.autofinish = Autofinish::Rejected;
-                                    }
-                                },
-                            );
-                        });
-                    });
-            }
-            Autofinish::Rejected => {}
-            Autofinish::InProgress => {
-                self.autofinish_step(ctx);
-            }
-            Autofinish::Succeed => {}
-        }
-    }
-
     /// Perform one autofinish step
-    fn autofinish_step(&mut self, ctx: &egui::Context) {
+    fn perform_autofinish_step(&mut self, ctx: &egui::Context) {
         let waste_len = self.board.waste.len();
         if waste_len > 0 && self.try_auto_move_to_foundation(ctx, PileId::Waste, waste_len - 1) {
             return;
@@ -862,8 +846,6 @@ impl KlondikeApp {
                 return;
             }
         }
-
-        self.autofinish = Autofinish::Succeed;
     }
 
     fn handle_autoplay(&mut self, ctx: &egui::Context) {
@@ -891,12 +873,10 @@ impl KlondikeApp {
         }
 
         if now < self.next_play_time {
-            ctx.request_repaint();
             return;
         }
 
         let Some((from, to, count)) = moves.get(*index).cloned() else {
-            self.autoplay = false;
             return;
         };
         let mut factor = 1.0;
@@ -963,6 +943,23 @@ impl KlondikeApp {
         if self.autoplay {
             self.next_play_time = 0.0;
         }
+    }
+
+    fn handle_moved(&mut self, ctx: &egui::Context) {
+        let score = self.board.score();
+        let is_win = score == 52;
+        if is_win {
+            if self.end_time.is_none() {
+                self.end_time = Some(ctx.input(|i| i.time));
+            }
+        } else if !self.autoplay
+            && self.autofinish == Autofinish::Idle
+            && self.board.can_autofinish()
+        {
+            self.autofinish = Autofinish::Asking;
+        }
+        self.score = score;
+        self.hook_moved = false;
     }
 
     /// Try to auto-move card to foundation pile
