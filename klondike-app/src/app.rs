@@ -29,6 +29,7 @@ pub struct KlondikeApp {
     has_card_moved: bool,
     score: u8,
     start_time: f64,
+    end_time: Option<f64>,
     autoplay: bool,
     next_play_time: f64,
 }
@@ -111,8 +112,15 @@ impl eframe::App for KlondikeApp {
             return;
         }
 
+        self.score = self.board.score();
+        let is_win = self.score == 52;
+        if is_win {
+            if self.end_time.is_none() {
+                self.end_time = Some(ctx.input(|i| i.time));
+            }
+        }
+
         if self.autoplay {
-            self.score = self.board.score();
             self.handle_autoplay(ctx);
             return;
         }
@@ -127,13 +135,16 @@ impl eframe::App for KlondikeApp {
         }
 
         if self.has_card_moved {
-            self.score = self.board.score();
-            if self.score == 52 {
+            if is_win {
                 self.handle_win(ctx);
             } else {
                 self.handle_autofinish(ctx);
             }
             self.has_card_moved = false;
+        }
+
+        if self.end_time.is_none() {
+            ctx.request_repaint();
         }
     }
 }
@@ -162,6 +173,7 @@ impl KlondikeApp {
             has_card_moved: false,
             score: 0,
             start_time: 0.0,
+            end_time: None,
 
             autoplay: false,
             next_play_time: 0.0,
@@ -486,7 +498,11 @@ impl KlondikeApp {
                 ui.separator();
                 ui.label(format!("Moves: {}", self.history.len()));
                 ui.separator();
-                let time = ctx.input(|i| i.time) - self.start_time;
+                let time = if let Some(end_time) = self.end_time {
+                    end_time - self.start_time
+                } else {
+                    ctx.input(|i| i.time) - self.start_time
+                };
                 ui.label(format!("Time: {:.0}s", time));
             });
         });
