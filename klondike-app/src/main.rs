@@ -1,5 +1,3 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-
 mod app;
 mod common;
 
@@ -35,7 +33,9 @@ fn main() -> anyhow::Result<()> {
     let draw_count = cli.draw;
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([710.0, 775.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([710.0, 775.0])
+            .with_resizable(false),
         ..Default::default()
     };
 
