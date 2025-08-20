@@ -231,14 +231,14 @@ impl Board {
         Ok(cards)
     }
 
-    pub fn score(&mut self) -> u8 {
+    pub fn score(&self) -> u8 {
         self.foundations.iter().map(|f| f.len() as u8).sum()
     }
 
     pub fn can_autofinish(&self) -> bool {
         self.stock.is_empty()
             && (self.waste.len() <= self.draw_count && self.waste.is_sorted())
-            && self.foundations.iter().map(|f| f.len()).sum::<usize>() < 51 // 至少有一张牌在桌面上
+            && self.score() < 51
             && self
                 .tableaus
                 .iter()

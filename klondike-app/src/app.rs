@@ -26,7 +26,7 @@ pub struct KlondikeApp {
     history: Vec<GameMove>,
     redo_stack: Vec<GameMove>,
     autofinish: Autofinish,
-    has_card_moved: bool,
+    hook_moved: bool,
     score: u8,
     start_time: f64,
     end_time: Option<f64>,
@@ -112,15 +112,13 @@ impl eframe::App for KlondikeApp {
             return;
         }
 
-        self.score = self.board.score();
-        let is_win = self.score == 52;
-        if is_win
-            && self.end_time.is_none() {
-                self.end_time = Some(ctx.input(|i| i.time));
-            }
+        if self.hook_moved {
+            self.handle_moved(ctx);
+        }
 
         if self.autoplay {
             self.handle_autoplay(ctx);
+            ctx.request_repaint();
             return;
         }
 
@@ -133,18 +131,21 @@ impl eframe::App for KlondikeApp {
             self.return_dragged_cards();
         }
 
-        if self.has_card_moved {
-            if is_win {
-                self.handle_win(ctx);
-            } else {
-                self.handle_autofinish(ctx);
+        if self.score == 52 {
+            self.popup_win(ctx);
+        } else {
+            match self.autofinish {
+                Autofinish::Asking => {
+                    self.popup_autofinish(ctx);
+                }
+                Autofinish::InProgress => {
+                    self.autofinish_step(ctx);
+                }
+                _ => {}
             }
-            self.has_card_moved = false;
         }
 
-        if self.end_time.is_none() {
-            ctx.request_repaint();
-        }
+        ctx.request_repaint();
     }
 }
 
@@ -169,7 +170,7 @@ impl KlondikeApp {
             redo_stack: Vec::new(),
 
             autofinish: Autofinish::Idle,
-            has_card_moved: false,
+            hook_moved: false,
             score: 0,
             start_time: 0.0,
             end_time: None,
@@ -547,7 +548,7 @@ impl KlondikeApp {
             self.animations.remove(idx);
         }
 
-        self.has_card_moved = true;
+        self.hook_moved = true;
     }
 
     /// Apply a move and record it in history
@@ -771,7 +772,7 @@ impl KlondikeApp {
                 self.dragged_cards.clear();
                 self.drag_source = None;
 
-                self.has_card_moved = true;
+                self.hook_moved = true;
             }
             _ => {
                 self.return_dragged_cards();
@@ -792,7 +793,7 @@ impl KlondikeApp {
         }
     }
 
-    fn handle_win(&mut self, ctx: &egui::Context) {
+    fn popup_win(&mut self, ctx: &egui::Context) {
         egui::Window::new("Victory")
             .collapsible(false)
             .resizable(false)
@@ -807,50 +808,36 @@ impl KlondikeApp {
             });
     }
 
-    fn handle_autofinish(&mut self, ctx: &egui::Context) {
-        match self.autofinish {
-            Autofinish::Idle => {
-                if self.board.can_autofinish() {
-                    self.autofinish = Autofinish::Asking;
-                }
-            }
-            Autofinish::Asking => {
-                egui::Window::new("Autofinish")
-                    .collapsible(false)
-                    .resizable(false)
-                    .fixed_size([360.0, 60.0])
-                    .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                    .show(ctx, |ui| {
-                        ui.label("All cards are face up and in order, do you want to autofinish?");
-                        ui.add_space(10.0);
-                        ui.columns(2, |columns| {
-                            columns[0].with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    ui.add_space(40.);
-                                    if ui.button("Yes").clicked() {
-                                        self.autofinish = Autofinish::InProgress;
-                                    }
-                                },
-                            );
-                            columns[1].with_layout(
-                                egui::Layout::left_to_right(egui::Align::Center),
-                                |ui| {
-                                    ui.add_space(40.);
-                                    if ui.button("No").clicked() {
-                                        self.autofinish = Autofinish::Rejected;
-                                    }
-                                },
-                            );
-                        });
-                    });
-            }
-            Autofinish::Rejected => {}
-            Autofinish::InProgress => {
-                self.autofinish_step(ctx);
-            }
-            Autofinish::Succeed => {}
-        }
+    fn popup_autofinish(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Autofinish")
+            .collapsible(false)
+            .resizable(false)
+            .fixed_size([360.0, 60.0])
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.label("All cards are face up and in order, do you want to autofinish?");
+                ui.add_space(10.0);
+                ui.columns(2, |columns| {
+                    columns[0].with_layout(
+                        egui::Layout::right_to_left(egui::Align::Center),
+                        |ui| {
+                            ui.add_space(40.);
+                            if ui.button("Yes").clicked() {
+                                self.autofinish = Autofinish::InProgress;
+                            }
+                        },
+                    );
+                    columns[1].with_layout(
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            ui.add_space(40.);
+                            if ui.button("No").clicked() {
+                                self.autofinish = Autofinish::Rejected;
+                            }
+                        },
+                    );
+                });
+            });
     }
 
     /// Perform one autofinish step
@@ -897,12 +884,10 @@ impl KlondikeApp {
         }
 
         if now < self.next_play_time {
-            ctx.request_repaint();
             return;
         }
 
         let Some((from, to, count)) = moves.get(*index).cloned() else {
-            self.autoplay = false;
             return;
         };
         let mut factor = 1.0;
@@ -969,6 +954,23 @@ impl KlondikeApp {
         if self.autoplay {
             self.next_play_time = 0.0;
         }
+    }
+
+    fn handle_moved(&mut self, ctx: &egui::Context) {
+        let score = self.board.score();
+        let is_win = score == 52;
+        if is_win {
+            if self.end_time.is_none() {
+                self.end_time = Some(ctx.input(|i| i.time));
+            }
+        } else if !self.autoplay
+            && matches!(self.autofinish, Autofinish::Idle)
+            && self.board.can_autofinish()
+        {
+            self.autofinish = Autofinish::Asking;
+        }
+        self.score = score;
+        self.hook_moved = false;
     }
 
     /// Try to auto-move card to foundation pile
