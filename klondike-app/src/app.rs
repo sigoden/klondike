@@ -204,7 +204,7 @@ impl KlondikeApp {
     /// Draw a card in the specified rectangle
     fn paint_card(painter: &egui::Painter, rect: Rect, card: &Card) {
         let bg_color = if card.face_up {
-            Color32::WHITE
+            Color32::from_gray(248)
         } else {
             Color32::from_rgb(0, 128, 128)
         };
@@ -212,7 +212,7 @@ impl KlondikeApp {
         painter.rect_stroke(
             rect,
             CornerRadius::same(5),
-            Stroke::new(1.0, Color32::BLACK),
+            Stroke::new(1.0, Color32::from_gray(100)),
             StrokeKind::Inside,
         );
 
@@ -295,19 +295,8 @@ impl KlondikeApp {
         let painter = ui.painter_at(rect);
         if self.board.stock.is_empty() {
             Self::paint_empty_pile(&painter, rect);
-            painter.circle_stroke(
-                rect.center(),
-                15.0,
-                Stroke::new(2.0, Color32::from_gray(100)),
-            );
         } else {
             Self::paint_card(&painter, rect, &Card::new_with_id(0));
-            painter.rect_stroke(
-                rect,
-                CornerRadius::same(5),
-                Stroke::new(2.0, Color32::YELLOW),
-                StrokeKind::Inside,
-            );
         }
     }
 
